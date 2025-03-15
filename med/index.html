@@ -136,11 +136,13 @@
 
 <div id="medication-name"></div>
 
+<p class="elapsed-time" id="elapsed-time">Time since last dose: --:--:--</p>
+
 <div class="capsule-container" id="capsule-container"></div>
 
-<button class="reset-button" onclick="resetDay()">New Day</button>
+<button class="reset-button" onclick="showResetModal()">New Day</button>
 
-<p class="elapsed-time" id="elapsed-time">Time since last dose: --:--:--</p>
+<p></p>
 
 <details class="settings">
   <summary>Settings</summary>
@@ -148,7 +150,7 @@
     <input type="text" id="medication-input">
   </label>
   <label>Number of Capsules:
-    <input type="number" id="capsule-count" min="1" max="10">
+    <input type="number" id="capsule-count" min="1" max="99">
   </label>
   <button class="save-settings" onclick="saveSettings()">Save Settings</button>
 </details>
@@ -162,6 +164,17 @@
     </div>
   </div>
 </div>
+
+<div id="modal-overlay-reset" class="modal-overlay">
+  <div class="modal">
+    <p id="modal-message-reset"></p>
+    <div class="modal-buttons">
+      <button class="modal-button" onclick="confirmReset()">Yes</button>
+      <button class="modal-button" onclick="hideModalReset()">No</button>
+    </div>
+  </div>
+</div>
+
 
 <script>
 let capsules = [];
@@ -202,7 +215,7 @@ function takeCapsule(index) {
 
 function showUndoModal(index) {
   undoIndex = index;
-  document.getElementById("modal-message").textContent = "Undo or clear this time?";
+  document.getElementById("modal-message").textContent = "Clear this dose?";
   document.getElementById("modal-overlay").style.display = "flex";
 }
 
@@ -213,6 +226,16 @@ function confirmUndo() {
     renderCapsules();
   }
   hideModal();
+}
+
+function showResetModal() {
+  document.getElementById("modal-message-reset").textContent = "Clear all doses?";
+  document.getElementById("modal-overlay-reset").style.display = "flex";
+}
+
+function confirmReset() {
+  resetDay();
+  hideModalReset();
 }
 
 function resetDay() {
@@ -258,6 +281,10 @@ function formatTime(date) {
 
 function hideModal() {
   document.getElementById("modal-overlay").style.display = "none";
+}
+
+function hideModalReset() {
+  document.getElementById("modal-overlay-reset").style.display = "none";
 }
 
 loadSettings();
