@@ -149,7 +149,7 @@
   <label>Medication Name:
     <input type="text" id="medication-input">
   </label>
-  <label>Number of Capsules:
+  <label>Number of Doses:
     <input type="number" id="capsule-count" min="1" max="99">
   </label>
   <button class="save-settings" onclick="saveSettings()">Save Settings</button>
@@ -198,7 +198,7 @@ function renderCapsules() {
     let formattedTime = time ? formatTime(new Date(time)) : "—";
     let div = document.createElement("div");
     div.className = "capsule" + (time ? " taken" : "");
-    div.innerHTML = `<span>Capsule ${index + 1}</span> 
+    div.innerHTML = `<span>Dose ${index + 1}</span> 
                      <span class="capsule-time" onclick="showUndoModal(${index})">${formattedTime}</span>`;
     div.onclick = () => takeCapsule(index);
     container.appendChild(div);
