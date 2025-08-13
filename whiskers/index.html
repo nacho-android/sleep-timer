@@ -14,10 +14,7 @@
       --panel: rgba(255,255,255,0.06);
       --panel-strong: rgba(255,255,255,0.12);
     }
-    html, body {
-      margin: 0; height: 100%; background: var(--bg); color: var(--fg);
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell;
-    }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell; }
     #wrap { position: fixed; inset: 0; display: grid; grid-template-rows: 1fr; }
     #game { position: relative; overflow: hidden; }
     canvas { display: block; width: 100%; height: 100%; touch-action: none; }
@@ -51,7 +48,7 @@
     .hint { font-size: 12px; opacity: 0.8; }
 
     /* Toast */
-    .toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 10px) + 88px); background: rgba(20,24,34,0.9); border:1px solid var(--panel-strong); border-radius: 14px; padding: 8px 12px; font-size: 12px; opacity: 0; transition: opacity .25s ease, transform .25s ease; }
+    .toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 10px) + 88px); background: rgba(20,24,34,0.9); border:1px solid var(--panel-strong); border-radius: 14px; padding: 8px 12px; font-size: 12px; opacity: 0; transition: opacity .25s ease, transform .25s ease; pointer-events: none; }
     .toast.show { opacity: 1; transform: translate(-50%, -4px); }
   </style>
 </head>
@@ -131,13 +128,13 @@
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0b0e13);
 
-    const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 200);
-    camera.position.set(0.6, 3.3, 6.2);
+    const camera = new THREE.PerspectiveCamera(58, innerWidth/innerHeight, 0.1, 200);
+    camera.position.set(1.2, 4.4, 7.4); // higher and wider so the bowl is always visible
 
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x223344, 0.8);
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x223344, 0.9);
     scene.add(hemi);
-    const dir = new THREE.DirectionalLight(0xffffff, 0.9);
-    dir.position.set(4,6,3);
+    const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+    dir.position.set(5,7,4);
     dir.castShadow = true;
     dir.shadow.mapSize.set(1024,1024);
     scene.add(dir);
@@ -147,7 +144,7 @@
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     // Floor (nursery rug)
-    const floorGeo = new THREE.CylinderGeometry(6.5, 6.5, 0.2, 48);
+    const floorGeo = new THREE.CylinderGeometry(6.8, 6.8, 0.2, 64);
     const floorMat = new THREE.MeshStandardMaterial({ color: 0x101623, metalness: 0.05, roughness: 0.9 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.receiveShadow = true;
@@ -174,21 +171,34 @@
     cot.position.set(0,0, -2.4);
     scene.add(cot);
 
-    // Dangling toy above cot
-    const toyGroup = new THREE.Group();
+    // Baby (sleeping) inside cot
+    const baby = new THREE.Group();
+    const skin = 0xffd4b8;
+    const babyBody = new THREE.Mesh(new THREE.SphereGeometry(0.36, 18, 14), new THREE.MeshStandardMaterial({ color: skin, roughness: 0.8 }));
+    babyBody.scale.set(1.2, 0.6, 0.8); babyBody.position.set(0, 0.96, 0);
+    const babyHead = new THREE.Mesh(new THREE.SphereGeometry(0.18, 18, 14), new THREE.MeshStandardMaterial({ color: skin }));
+    babyHead.position.set(0.25, 1.06, 0);
+    const blanket = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.05, 0.9), new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0, roughness: 1 }));
+    blanket.position.set(-0.15, 1.02, 0);
+    baby.add(babyBody, babyHead, blanket);
+    scene.add(baby);
+
+    // Dangling toy above cot — swinging pendulum
+    const toyAnchor = new THREE.Group();
+    toyAnchor.position.set(0, 2.8, -2.4); // pivot at the top
     const string = new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,1.2,8), new THREE.MeshStandardMaterial({ color: 0xffffff }));
-    string.position.y = 2.2; toyGroup.add(string);
+    string.position.y = -0.6; // hang down from anchor
+    toyAnchor.add(string);
     const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.18,0), new THREE.MeshStandardMaterial({ color: 0xffc34d, emissive: 0x331c00 }));
-    star.position.y = 1.6; star.castShadow = true; toyGroup.add(star);
-    toyGroup.position.set(0,0,-2.4);
-    scene.add(toyGroup);
+    star.position.y = -1.2; star.castShadow = true; toyAnchor.add(star);
+    scene.add(toyAnchor);
 
     // ----- Bowl (lure target) -----
     const bowl = new THREE.Group();
     const bowlOuter = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 0.22, 32), new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.4 }));
     const bowlInner = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 0.2, 32), new THREE.MeshStandardMaterial({ color: 0x11131a }));
     bowlInner.position.y = 0.02; bowl.add(bowlOuter); bowl.add(bowlInner);
-    bowl.position.set(-1.6, 0.11, 1.2);
+    bowl.position.set(-1.6, 0.11, 1.2); // camera is higher now, this is visible
     bowl.castShadow = bowl.receiveShadow = true;
     scene.add(bowl);
 
@@ -211,21 +221,47 @@
     makeBell(1.4, -0.2);
     makeBell(0.9, 1.5);
 
-    // ----- Whiskers (hero) -----
+    // ----- Whiskers (hero) — more detail and faux fur -----
     const whiskers = new THREE.Group();
-    // body
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 18, 14), new THREE.MeshStandardMaterial({ color: 0x3f3d56, roughness: 0.9 }));
-    body.scale.set(1.4, 1.0, 1.0); body.position.y = 0.35; body.castShadow = true; whiskers.add(body);
+    // body base
+    const furColor = 0x524f6f;
+    const catBody = new THREE.Mesh(new THREE.SphereGeometry(0.34, 22, 18), new THREE.MeshStandardMaterial({ color: furColor, roughness: 0.95 }));
+    catBody.scale.set(1.45, 1.0, 1.0); catBody.position.y = 0.35; catBody.castShadow = true; whiskers.add(catBody);
     // head
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 18, 14), new THREE.MeshStandardMaterial({ color: 0x4b4a67, roughness: 0.85 }));
-    head.position.set(0.22, 0.58, 0); head.castShadow = true; whiskers.add(head);
+    const catHead = new THREE.Mesh(new THREE.SphereGeometry(0.24, 22, 18), new THREE.MeshStandardMaterial({ color: 0x5d5a7e, roughness: 0.9 }));
+    catHead.position.set(0.22, 0.6, 0); catHead.castShadow = true; whiskers.add(catHead);
     // ears
     const earGeo = new THREE.ConeGeometry(0.09, 0.14, 8);
-    const ear1 = new THREE.Mesh(earGeo, new THREE.MeshStandardMaterial({ color: 0x5b5a7b })); ear1.position.set(0.3,0.78,0.08); ear1.rotation.z = -0.3; whiskers.add(ear1);
+    const ear1 = new THREE.Mesh(earGeo, new THREE.MeshStandardMaterial({ color: 0x6a688d })); ear1.position.set(0.32,0.83,0.08); ear1.rotation.z = -0.3; whiskers.add(ear1);
     const ear2 = ear1.clone(); ear2.position.z = -0.08; ear2.rotation.z = 0.3; whiskers.add(ear2);
     // tail
-    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 0.6, 10), new THREE.MeshStandardMaterial({ color: 0x3f3d56 }));
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 0.6, 12), new THREE.MeshStandardMaterial({ color: furColor }));
     tail.position.set(-0.45,0.6,0); tail.rotation.z = 1.1; whiskers.add(tail);
+    // face details
+    const eyeGeo = new THREE.SphereGeometry(0.028, 10, 8);
+    const eyeMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.2, roughness: 0.2 });
+    const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(0.3, 0.65, 0.06); whiskers.add(eyeL);
+    const eyeR = eyeL.clone(); eyeR.position.z = -0.06; whiskers.add(eyeR);
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.06, 8), new THREE.MeshStandardMaterial({ color: 0xff7f7f }));
+    nose.rotation.x = Math.PI/2; nose.position.set(0.32, 0.6, 0); whiskers.add(nose);
+    // whisker cards
+    function addWhisker(y,z,dir){
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.28, 6), new THREE.MeshStandardMaterial({ color: 0xe5e7eb, metalness: 0.1, roughness: 0.4 }));
+      w.position.set(0.34, y, z); w.rotation.z = dir; whiskers.add(w);
+    }
+    addWhisker(0.6, 0.06, -0.6); addWhisker(0.62, 0.06, -0.2); addWhisker(0.58, 0.06, 0.2);
+    addWhisker(0.6, -0.06, 0.6); addWhisker(0.62, -0.06, 0.2); addWhisker(0.58, -0.06, -0.2);
+    // simple faux fur tufts
+    const tuftGeo = new THREE.ConeGeometry(0.03, 0.08, 6);
+    const tuftMat = new THREE.MeshStandardMaterial({ color: 0x6c6a8c, roughness: 0.95 });
+    for (let i=0;i<40;i++){
+      const t = new THREE.Mesh(tuftGeo, tuftMat);
+      const a = (i/40)*Math.PI*2;
+      t.position.set(Math.cos(a)*0.18 + (Math.random()*0.06-0.03), 0.35 + (Math.random()*0.1-0.05), Math.sin(a)*0.18 + (Math.random()*0.06-0.03));
+      t.rotation.set(Math.random()*0.6, Math.random()*Math.PI*2, Math.random()*0.6);
+      whiskers.add(t);
+    }
+
     whiskers.position.set(-2.2, 0.05, -1.0);
     whiskers.castShadow = whiskers.receiveShadow = true;
     scene.add(whiskers);
@@ -239,15 +275,30 @@
       running: false,
       over: false,
       time: 0,
-      duration: 60, // seconds to survive
-      wake: 0, // 0..100
-      treatAttract: 0, // frames remaining
+      duration: 60,
+      wake: 0,
+      treatAttract: 0,
       bowlPulse: 0,
       swipe: { start: null, t: 0 },
-      v: new THREE.Vector3(0.04, 0, 0.02), // Whiskers velocity
+      v: new THREE.Vector3(0.012, 0, 0.008), // slower baseline speed
       a: new THREE.Vector3(),
+      mode: 'wander', // 'wander' -> 'approach' -> 'perch' -> 'reach'
+      modeTimer: 0,
       toyPos: new THREE.Vector3(0, 1.6, -2.4),
+      perchPos: new THREE.Vector3(0.0, 1.15, -1.8),
+      waypoints: []
     };
+
+    // create a few random waypoints towards the cot
+    function resetWaypoints(){
+      state.waypoints = [];
+      for (let i=0;i<3;i++){
+        const x = -1.8 + Math.random()*3.6;
+        const z = -0.6 - Math.random()*2.2; // trending towards cot
+        state.waypoints.push(new THREE.Vector3(x, 0, z));
+      }
+    }
+    resetWaypoints();
 
     // ----- UI Elements -----
     const startOverlay = document.getElementById('startOverlay');
@@ -259,7 +310,6 @@
     const wakeFill = document.getElementById('wakeFill');
     const toast = document.getElementById('toast');
 
-    // Buttons
     document.getElementById('startBtn').onclick = () => start();
     document.getElementById('howBtn').onclick = () => showToast('Swipe to nudge. Drag a treat into the bowl to distract Whiskers.');
     document.getElementById('pauseBtn').onclick = () => pause();
@@ -279,13 +329,13 @@
       const dt = Math.max(1, performance.now() - state.swipe.start.t);
       const speed = Math.hypot(dx,dy) / dt; // px per ms
       if (speed > 0.5) { // quick swipe
-        // Map screen swipe to world XZ impulse relative to camera
-        const angle = Math.atan2(dx, dy); // screen coords: up is negative y
-        const strength = Math.min(0.18, speed * 0.22);
-        // Convert angle to world XZ (camera facing -Z)
+        const angle = Math.atan2(dx, dy);
+        const strength = Math.min(0.12, speed * 0.16); // softer impulses
         const impulse = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle)).multiplyScalar(strength);
         state.v.add(impulse);
         pulseWhiskers();
+        // interrupt approach/perch if strong enough
+        if (strength > 0.08 && state.mode !== 'wander') { state.mode = 'wander'; resetWaypoints(); state.modeTimer = 0; }
       }
       state.swipe.start = null;
     };
@@ -327,10 +377,12 @@
       dragging = false; treat.style.display = 'none';
       const b = screenPosOf(bowl);
       const d = Math.hypot(x - b.x, y - b.y);
-      if (d < 80) { // success
-        state.treatAttract = 6 * 60; // frames (~6s)
+      if (d < 90) { // easier to hit
+        state.treatAttract = 7 * 60; // ~7s
         state.bowlPulse = 60;
         showToast('Treat added! Whiskers is distracted.');
+        // break approach flow
+        state.mode = 'wander'; resetWaypoints(); state.modeTimer = 0;
       } else {
         showToast('Missed the bowl. Try again.');
       }
@@ -353,20 +405,20 @@
     function start(){
       startOverlay.style.display = 'none';
       endOverlay.style.display = 'none';
-      state.running = true; state.over = false; state.time = 0; state.wake = 0; state.treatAttract = 0;
+      state.running = true; state.over = false; state.time = 0; state.wake = 0; state.treatAttract = 0; state.mode='wander'; state.modeTimer=0; resetWaypoints();
+      whiskers.position.set(-2.2, 0.05, -1.0); state.v.set(0.012,0,0.008);
     }
     function pause(){ if(!state.running) return; state.running = false; pauseOverlay.style.display = 'grid'; }
     function resume(){ state.running = true; pauseOverlay.style.display = 'none'; }
     function restart(){
-      // reset positions
-      whiskers.position.set(-2.2, 0.05, -1.0); state.v.set(0.04,0,0.02);
       bells.forEach(b=>{ b.woke=false; });
-      bowl.position.set(-1.6, 0.11, 1.2);
       start();
     }
 
     // ----- Core Update Loop -----
     const tmp = new THREE.Vector3();
+    let jumpPhase = 0; // 0 idle, 1 jumping arc
+
     function update(dt){
       if (!state.running || state.over) return;
 
@@ -374,58 +426,103 @@
       state.time += dt; const t = clamp(state.time / state.duration, 0, 1); timeFill.style.width = (t*100).toFixed(1)+'%';
       if (state.time >= state.duration){ return win(); }
 
-      // Attraction: treat vs toy
-      const target = tmp.set(0,0,0);
+      // Swing toy (small pendulum)
+      const swing = Math.sin(performance.now()*0.0025) * 0.3; // radians
+      toyAnchor.rotation.x = swing * 0.2; // gentle fore/back
+      toyAnchor.rotation.z = swing; // main side swing
+
+      // Baby breathing
+      const breath = 1 + Math.sin(performance.now()*0.003)*0.02;
+      babyBody.scale.y = 0.6 * breath; // baby body breathing
+
+      // Movement target selection via mode machine
+      const cat = whiskers.position;
+      let target = tmp.set(0,0,0);
+
+      // treat attraction overrides everything
       if (state.treatAttract > 0){
         const bp = new THREE.Vector3(); bowl.getWorldPosition(bp); target.copy(bp);
         state.treatAttract--; if (state.bowlPulse>0) state.bowlPulse--;
-      } else { target.set(state.toyPos.x,0,state.toyPos.z); }
+      } else {
+        if (state.mode === 'wander'){
+          if (state.waypoints.length === 0){ state.mode = 'approach'; }
+          else {
+            target.copy(state.waypoints[0]);
+            if (distXZ(cat, target) < 0.25) { state.waypoints.shift(); }
+          }
+        }
+        if (state.mode === 'approach'){
+          target.set(0.0,0,-2.0); // front of cot
+          if (distXZ(cat, target) < 0.35){ state.mode = 'perch'; state.modeTimer = 0; jumpPhase = 1; }
+        }
+        if (state.mode === 'perch'){
+          target.copy(state.perchPos); // edge atop cot frame
+          state.modeTimer += dt;
+          if (state.modeTimer > 1.2){ state.mode = 'reach'; state.modeTimer = 0; }
+        }
+        if (state.mode === 'reach'){
+          // reaching triggers loss after a short beat
+          state.modeTimer += dt;
+          if (state.modeTimer > 1.0){ return lose('Whiskers reached for the toy and fell into the cot! The baby woke up.'); }
+          target.set(0,0,-2.3);
+        }
+      }
 
-      // Simple steering towards target with slight wander
-      const cat = whiskers.position;
-      const desired = tmp.set(target.x - cat.x, 0, target.z - cat.z).normalize().multiplyScalar(0.06);
-      // Add wander
-      desired.x += (Math.sin(performance.now()*0.002) * 0.008);
-      desired.z += (Math.cos(performance.now()*0.0017) * 0.008);
-      state.a.copy(desired).sub(state.v).multiplyScalar(0.12);
+      // steering towards target
+      const desired = tmp.set(target.x - cat.x, 0, target.z - cat.z).normalize().multiplyScalar(0.038); // slower
+      desired.x += (Math.sin(performance.now()*0.002) * 0.006);
+      desired.z += (Math.cos(performance.now()*0.0017) * 0.006);
+      state.a.copy(desired).sub(state.v).multiplyScalar(0.1);
       state.v.add(state.a);
-      // friction
       state.v.multiplyScalar(0.992);
-      // move
-      cat.add(state.v);
-      catShadow.position.set(cat.x, 0.001, cat.z);
+
+      // jump arc when perching
+      if (jumpPhase === 1){
+        const toPerchXZ = new THREE.Vector3(state.perchPos.x - cat.x, 0, state.perchPos.z - cat.z);
+        const dist = toPerchXZ.length();
+        const jumpSpeed = 0.06;
+        const step = toPerchXZ.normalize().multiplyScalar(jumpSpeed);
+        whiskers.position.add(step);
+        whiskers.position.y = 0.05 + Math.sin((1 - clamp(dist / 1.2, 0, 1)) * Math.PI) * 0.5; // arc
+        if (dist < 0.05){ jumpPhase = 0; whiskers.position.y = state.perchPos.y; }
+      } else {
+        // normal move
+        cat.add(state.v);
+        whiskers.position.y += (0.05 - whiskers.position.y) * 0.15; // settle to ground when not jumping/perched
+      }
+
+      // keep shadow
+      catShadow.position.set(whiskers.position.x, 0.001, whiskers.position.z);
 
       // Bounds bounce
-      const r = 6.2; const d = Math.hypot(cat.x, cat.z);
-      if (d > r){ state.v.multiplyScalar(-0.6); whiskers.position.set(cat.x*(r/d), cat.y, cat.z*(r/d)); }
+      const r = 6.4; const d = Math.hypot(cat.x, cat.z);
+      if (d > r){ state.v.multiplyScalar(-0.6); whiskers.position.set(cat.x*(r/d), whiskers.position.y, cat.z*(r/d)); }
 
       // Bells collision
       for (const b of bells){
-        const p = b.g.position; const dd = distXZ(p, cat);
+        const p = b.g.position; const dd = distXZ(p, whiskers.position);
         if (dd < b.r + 0.25){
-          // bounce away and wake increase
-          const away = tmp.set(cat.x-p.x,0,cat.z-p.z).normalize().multiplyScalar(0.08);
+          const away = tmp.set(whiskers.position.x-p.x,0,whiskers.position.z-p.z).normalize().multiplyScalar(0.06);
           state.v.add(away);
-          if (!b.woke){
-            bumpWake(10); b.woke = true; b.bumpTime = 32; setTimeout(()=> b.woke=false, 1200);
-          }
+          if (!b.woke){ bumpWake(10); b.woke = true; b.bumpTime = 32; setTimeout(()=> b.woke=false, 1200); }
         }
-        // tiny bell jiggle visual
         if (b.bumpTime>0){ b.g.rotation.z = Math.sin(performance.now()*0.04)*0.15; b.bumpTime--; } else { b.g.rotation.z *= 0.9; }
       }
 
-      // Reach toy? -> fall into cot -> lose
-      const toyXZ = new THREE.Vector3(state.toyPos.x,0,state.toyPos.z);
-      const dToy = distXZ(cat, toyXZ);
-      if (dToy < 0.4){
+      // If near toy while not on perch (e.g., by swipes) -> lose
+      const toyXZ = new THREE.Vector3(0,0,-2.4);
+      if (distXZ(whiskers.position, toyXZ) < 0.4 && state.mode !== 'wander'){
         return lose('Whiskers reached the toy and fell into the cot! The baby woke up.');
       }
 
       // Bowl pulse effect
       bowl.scale.setScalar(1 + (state.bowlPulse>0 ? Math.sin(performance.now()*0.02)*0.06+0.1 : 0));
 
-      // Head look-at target
-      head.lookAt(target.x, head.position.y, target.z);
+      // Head look-at
+      catHead.lookAt(target.x, catHead.position.y, target.z);
+
+      // Camera look
+      camera.lookAt(0, 0.8, -1.6);
     }
 
     function bumpWake(amount){ state.wake = clamp(state.wake + amount, 0, 100); wakeFill.style.width = state.wake+'%'; if (state.wake >= 100){ lose('The bells rang too much and the baby woke up!'); } }
@@ -453,7 +550,21 @@
     }
     addEventListener('resize', onResize);
 
-    // Start in idle state
+    // ----- Minimal Self-Tests (dev) -----
+    (function runSelfTests(){
+      const results = [];
+      try {
+        results.push(['DOM elements', !!document.getElementById('startBtn') && !!document.getElementById('packet')]);
+        results.push(['Models exist', !!whiskers && !!bowl && !!cot && !!baby]);
+        results.push(['No duplicate names', typeof catBody !== 'undefined' && typeof babyBody !== 'undefined' && typeof catHead !== 'undefined' && typeof babyHead !== 'undefined']);
+        results.push(['Update loop', typeof update === 'function']);
+        const allPass = results.every(r=>r[1]);
+        console.table(results.map(([k,v])=>({ test:k, pass:v })));
+        console.log(allPass ? 'Self-tests passed' : 'Self-tests FAILED');
+      } catch (e) {
+        console.error('Self-tests error', e);
+      }
+    })();
   </script>
 </body>
 </html>
