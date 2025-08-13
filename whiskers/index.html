@@ -1,506 +1,459 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Whiskers — Soft Paws</title>
+  <title>Whiskers: Don't Wake the Baby</title>
   <style>
-    :root{
-      --bg1:#0e1630; /* night blue */
-      --bg2:#1c2a55;
-      --accent:#ffd86b; /* warm star */
-      --toy:#ffe27a;
-      --crib:#d7d7e0;
-      --rail:#c6c6d2;
-      --cat1:#f0a35a; /* ginger */
-      --cat2:#f7c789;
-      --cat3:#e07a3f;
-      --ui:#ffffffcc;
-      --ui-dim:#ffffff88;
-      --shadow:#00000088;
-      --danger:#ff6b6b;
-      --ok:#64d6a4;
-      --warn:#ffb86b;
+    :root {
+      --bg: #0e0f14;
+      --fg: #e6e6e6;
+      --accent: #7dd3fc;
+      --danger: #f87171;
+      --success: #86efac;
+      --panel: rgba(255,255,255,0.06);
+      --panel-strong: rgba(255,255,255,0.12);
     }
-
-    html,body{ height:100%; margin:0; background: radial-gradient(120% 100% at 50% 0%, var(--bg2) 0%, var(--bg1) 60%); color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji"; overflow:hidden; -webkit-tap-highlight-color: transparent; }
-
-    #game{ position:fixed; inset:0; perspective: 900px; display:grid; place-items:center; }
-    #scene{ position:relative; width: 100vw; height: 100dvh; transform-style: preserve-3d; overflow:hidden; touch-action: none; }
-
-    /* Background wall with sleepy stars */
-    .stars{ position:absolute; inset: -10vmax; transform: translateZ(-200px) scale(1.2); opacity:.35; pointer-events:none; }
-
-    /* Baby silhouette (will wake on game over) */
-    .baby{ position:absolute; left:50%; bottom:32vh; width:44vmin; height:22vmin; transform: translate(-50%,0) translateZ(-80px); opacity:.5; filter: blur(.6px); pointer-events:none; transition: opacity .25s ease, filter .25s ease; }
-    .baby.awake{ opacity:0.95; filter:none; animation: startle .4s ease 3; }
-    @keyframes startle{ 0%{ transform: translate(-50%,0) translateZ(-80px) rotate(0deg);} 30%{ transform: translate(-50%,-3px) translateZ(-80px) rotate(-1deg);} 60%{ transform: translate(-50%,2px) translateZ(-80px) rotate(1deg);} 100%{ transform: translate(-50%,0) translateZ(-80px) rotate(0deg);} }
-
-    /* Crib layers */
-    .crib-back, .crib-front{ position:absolute; left:50%; transform:translateX(-50%); width:min(92vw, 820px); border-radius: 22px; background: linear-gradient(#eaeaf3,#cfd1dc); box-shadow: 0 10px 30px var(--shadow) inset; }
-    .crib-back{ bottom:30vh; height: 18vh; transform: translateX(-50%) translateZ(-40px) rotateX(2deg); opacity:.75; z-index:2; }
-    .crib-front{ bottom:8vh; height: 28vh; transform: translateX(-50%) translateZ(80px) rotateX(-3deg); box-shadow: 0 6px 18px var(--shadow); z-index:5; }
-
-    /* Railings via repeating gradient */
-    .rails{ position:absolute; inset:0; border-radius: inherit; overflow:hidden; }
-    .rails::before{ content:""; position:absolute; inset: 10px; border-radius: 16px; background: repeating-linear-gradient(90deg, var(--rail) 0 10px, #eef0f6 10px 18px); box-shadow: inset 0 0 0 10px #eef0f6aa; opacity:.95; }
-
-    /* Floor */
-    .floor{ position:absolute; left:0; right:0; bottom:-10vh; height:30vh; transform: translateZ(120px) rotateX(70deg); background: linear-gradient(transparent, #0a0f25 30%), repeating-linear-gradient(90deg, #0f193a 0 4px, #112149 4px 8px); filter: drop-shadow(0 -20px 40px #00000055); z-index:1; }
-
-    /* Toy string & star */
-    .toy{ position:absolute; left:50%; top:6vh; width:5vmin; height:5vmin; transform: translateZ(60px); pointer-events:none; z-index:3; }
-    .toy .string{ position:absolute; left:50%; top:-40vh; width:2px; height:45vh; transform: translateX(-50%); background: linear-gradient(#aaa,#ddd); opacity:.7; }
-    .star{ width:100%; height:100%; filter: drop-shadow(0 6px 6px #00000055); }
-
-    /* Canvas playfield: moved ABOVE crib front so Whiskers is outside */
-    #play{ position:absolute; inset:0; transform: translateZ(140px); z-index:8; }
+    html, body {
+      margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell;
+    }
+    #wrap { position: fixed; inset: 0; display: grid; grid-template-rows: 1fr; }
+    #game { position: relative; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
     /* HUD */
-    .hud{ position:absolute; left:50%; top:1.5vh; transform: translate(-50%,0) translateZ(160px); display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; z-index:10; }
-    .pill{ backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); background:#ffffff14; border:1px solid #ffffff22; padding:8px 12px; border-radius:999px; box-shadow:0 6px 18px #0006, inset 0 1px 0 #ffffff33; display:flex; align-items:center; gap:10px; }
-    .meter{ width:min(46vw, 320px); height:14px; background:#ffffff22; border-radius:999px; overflow:hidden; border:1px solid #ffffff44; }
-    .meter > i{ display:block; height:100%; width:0%; background: linear-gradient(90deg, var(--ok), var(--warn), var(--danger)); transition: width .2s ease; }
-    .timer{ font-weight:700; letter-spacing:.5px; text-shadow:0 1px 0 #0005; }
+    .hud { position: absolute; inset: 0; pointer-events: none; }
+    .topbar { position: absolute; top: env(safe-area-inset-top, 12px); left: 12px; right: 12px; display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    .bar, .chip { background: var(--panel); border-radius: 999px; box-shadow: 0 6px 20px rgba(0,0,0,0.25), inset 0 0 0 1px var(--panel-strong); }
+    .bar { height: 14px; overflow: hidden; }
+    .bar > .fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), #a78bfa); transition: width 140ms ease; }
+    .bar.danger > .fill { background: linear-gradient(90deg, var(--danger), #fb923c); }
 
-    .btn{ cursor:pointer; user-select:none; border:none; color:#fff; padding:10px 14px; border-radius:14px; font-weight:700; background: linear-gradient(180deg,#4b7bec,#3867d6); box-shadow:0 6px 18px #0006, inset 0 1px 0 #ffffff44; transition: transform .06s ease; touch-action: manipulation; }
-    .btn:active{ transform: translateY(1px) scale(.99); }
-    .btn.secondary{ background: linear-gradient(180deg,#2d98da,#0fb9b1); }
-    .btn.warning{ background: linear-gradient(180deg,#ff9f43,#ff793f); }
+    .chip { pointer-events: auto; display: inline-flex; align-items: center; gap: 8px; padding: 10px 12px; font-weight: 600; }
+    .chip button { all: unset; cursor: pointer; padding: 8px 12px; background: var(--panel-strong); border-radius: 14px; }
+    .chip button:active { transform: translateY(1px); }
 
-    /* Overlay messages */
-    #overlay{ position:absolute; inset:0; display:grid; place-items:center; z-index:20; pointer-events:none; }
-    .card{ pointer-events:auto; max-width:min(92vw,540px); border-radius:22px; padding:22px; background:#09112aee; border:1px solid #ffffff22; box-shadow: 0 20px 50px #0008; text-align:center; }
-    .card h1{ margin:.2rem 0 .4rem; font-size: clamp(1.2rem, 4.2vw, 2rem); }
-    .card p{ margin:.4rem 0 1rem; color:var(--ui); }
-    .row{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+    /* Center overlays */
+    .overlay { pointer-events: auto; position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(1200px 600px at 50% -10%, rgba(255,255,255,0.06), transparent 60%); }
+    .card { width: min(680px, 92vw); background: rgba(15,18,28,0.9); border: 1px solid var(--panel-strong); border-radius: 24px; padding: 18px 18px 14px; box-shadow: 0 15px 40px rgba(0,0,0,0.45); backdrop-filter: blur(8px); }
+    .title { font-size: 28px; font-weight: 800; letter-spacing: 0.2px; margin: 4px 0 12px; }
+    .subtitle { opacity: 0.85; line-height: 1.4; font-size: 14px; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .btn { all: unset; display: inline-flex; align-items: center; justify-content: center; padding: 12px 16px; border-radius: 16px; background: var(--accent); color: #05131f; font-weight: 800; cursor: pointer; }
+    .btn.secondary { background: var(--panel); color: var(--fg); border: 1px solid var(--panel-strong); }
+    .btn:active { transform: translateY(1px); }
 
-    /* Zzz bubbles */
-    .zzz{ position:absolute; left:50%; bottom: 46vh; transform: translateX(-50%) translateZ(-60px); font-weight:800; font-size:clamp(16px,4vw,24px); color:#ffffffbb; pointer-events:none; text-shadow:0 2px 0 #0006; transition: opacity .2s ease; }
-    .zzz.awake{ opacity:0; }
+    /* Treats drag UI */
+    #treatTray { position: absolute; bottom: env(safe-area-inset-bottom, 10px); left: 10px; right: 10px; display: flex; gap: 8px; pointer-events: auto; align-items: center; }
+    .packet { flex: 0 0 auto; width: 64px; height: 64px; border-radius: 14px; background: linear-gradient(160deg, #1f2937, #0b1220); border: 1px solid var(--panel-strong); display:grid; place-items:center; font-size: 12px; opacity: 0.95; }
+    .treat { width: 28px; height: 28px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, #ffd59e, #d97706); box-shadow: 0 8px 16px rgba(0,0,0,0.35); position: absolute; z-index: 20; left: 20px; bottom: 84px; display:none; }
+    .hint { font-size: 12px; opacity: 0.8; }
 
-    .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
+    /* Toast */
+    .toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 10px) + 88px); background: rgba(20,24,34,0.9); border:1px solid var(--panel-strong); border-radius: 14px; padding: 8px 12px; font-size: 12px; opacity: 0; transition: opacity .25s ease, transform .25s ease; }
+    .toast.show { opacity: 1; transform: translate(-50%, -4px); }
   </style>
 </head>
 <body>
-  <div id="game">
-    <div id="scene" aria-label="Whiskers—Soft Paws game scene" role="application">
-      <!-- distant stars for parallax -3D feel -->
-      <svg class="stars" viewBox="0 0 800 600" aria-hidden="true">
-        <defs>
-          <radialGradient id="sg" r="1">
-            <stop offset="0" stop-color="white"/>
-            <stop offset="1" stop-color="white" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <g>
-          <circle cx="50" cy="80" r="2" fill="url(#sg)"/>
-          <circle cx="120" cy="30" r="1.6" fill="url(#sg)"/>
-          <circle cx="240" cy="100" r="2.2" fill="url(#sg)"/>
-          <circle cx="360" cy="50" r="1.7" fill="url(#sg)"/>
-          <circle cx="600" cy="90" r="2.1" fill="url(#sg)"/>
-          <circle cx="740" cy="40" r="1.8" fill="url(#sg)"/>
-          <circle cx="140" cy="200" r="1.2" fill="url(#sg)"/>
-          <circle cx="420" cy="220" r="1.4" fill="url(#sg)"/>
-          <circle cx="520" cy="260" r="1.1" fill="url(#sg)"/>
-          <circle cx="700" cy="200" r="1.9" fill="url(#sg)"/>
-        </g>
-      </svg>
-
-      <!-- sleepy baby silhouette -->
-      <svg class="baby" id="baby" viewBox="0 0 300 150" aria-hidden="true">
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#9db1ff" stop-opacity=".5"/>
-            <stop offset="1" stop-color="#5c74c9" stop-opacity=".5"/>
-          </linearGradient>
-          <linearGradient id="awakeBg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#ffd1e3" stop-opacity="1"/>
-            <stop offset="1" stop-color="#ffc46b" stop-opacity="1"/>
-          </linearGradient>
-        </defs>
-        <g id="babySleep" fill="url(#bg)">
-          <ellipse cx="80" cy="80" rx="70" ry="40"/>
-          <circle cx="130" cy="60" r="22"/>
-          <rect x="160" y="60" width="120" height="38" rx="18"/>
-        </g>
-        <g id="babyAwake" fill="url(#awakeBg)" style="opacity:0; transition:opacity .2s ease">
-          <ellipse cx="80" cy="80" rx="70" ry="40"/>
-          <circle cx="130" cy="60" r="22"/>
-          <rect x="160" y="60" width="120" height="38" rx="18"/>
-          <!-- eyes open -->
-          <circle cx="120" cy="55" r="3" fill="#1c1c1c"/>
-          <circle cx="140" cy="55" r="3" fill="#1c1c1c"/>
-          <path d="M116 65 Q120 68 124 65" stroke="#1c1c1c" fill="none" stroke-width="2"/>
-        </g>
-      </svg>
-
-      <!-- Back crib -->
-      <div class="crib-back"><div class="rails" aria-hidden="true"></div></div>
-
-      <!-- Dangling toy (inside the cot) -->
-      <div class="toy" id="toy">
-        <div class="string"></div>
-        <svg class="star" viewBox="0 0 100 100">
-          <defs>
-            <radialGradient id="gold" cx="50%" cy="40%" r="60%">
-              <stop offset="0%" stop-color="#fff7c5"/>
-              <stop offset="50%" stop-color="#ffe27a"/>
-              <stop offset="100%" stop-color="#f5b642"/>
-            </radialGradient>
-          </defs>
-          <g fill="url(#gold)"><path d="M50 5 L61 35 L94 38 L68 58 L76 90 L50 72 L24 90 L32 58 L6 38 L39 35 Z"/></g>
-        </svg>
-      </div>
-
-      <!-- Front crib (below playfield so cat is outside) -->
-      <div class="crib-front"><div class="rails" aria-hidden="true"></div></div>
-
-      <!-- Playfield Canvas: Whiskers outside the cot -->
-      <canvas id="play" aria-label="Playfield"></canvas>
-
-      <!-- Floor -->
-      <div class="floor"></div>
-
-      <!-- HUD -->
-      <div class="hud" aria-live="polite" aria-atomic="true">
-        <div class="pill" title="Baby Sleep Meter">
-          <span>Baby Sleep</span>
-          <div class="meter" aria-hidden="true"><i id="meterFill"></i></div>
+  <div id="wrap">
+    <div id="game">
+      <canvas id="scene"></canvas>
+      <div class="hud">
+        <div class="topbar">
+          <div class="bar" title="Time">
+            <div id="timeFill" class="fill" style="width:0%"></div>
+          </div>
+          <div class="chip" style="gap:12px">
+            <span style="opacity:.8">Baby</span>
+            <div class="bar danger" style="width:120px;">
+              <div id="wakeFill" class="fill" style="width:0%"></div>
+            </div>
+            <button id="pauseBtn">Pause</button>
+          </div>
         </div>
-        <div class="pill timer" id="timer">00:45</div>
-        <button class="btn secondary" id="treatBtn" aria-label="Rattle a treat to lure Whiskers" type="button">Treat</button>
-        <button class="btn" id="motionBtn" aria-label="Enable motion controls for shaking the treat" type="button">Enable Motion</button>
-        <button class="btn warning" id="restartBtn" aria-label="Restart the game" type="button">Restart</button>
-      </div>
 
-      <!-- Zzz indicator -->
-      <div class="zzz" id="zzz">Z Z Z</div>
-
-      <!-- Overlay for start/win/lose -->
-      <div id="overlay">
-        <div class="card" id="card">
-          <h1 id="title">Whiskers — Soft Paws</h1>
-          <p id="subtitle">Swipe softly to keep Whiskers from the dangling toy. He can climb onto the rail and leap above the cot — but if he gets the toy and <strong>falls in</strong>, the baby wakes!</p>
-          <div class="row"><button class="btn" id="startBtn" type="button">Tap to Start</button></div>
-          <p style="opacity:.7; font-size:.9rem; margin-top:10px">Tip: Use Treat (or shake/tilt) to lure him away from the center.</p>
+        <div id="startOverlay" class="overlay">
+          <div class="card">
+            <div class="title">Whiskers: Don't Wake the Baby</div>
+            <div class="subtitle">
+              Swipe to nudge Whiskers. Drag <strong>treats</strong> from the packet into the <strong>bowl</strong> to lure him away.
+              Avoid the <strong>bells</strong>. If Whiskers reaches the dangling toy, he'll tumble into the cot and wake the baby.
+              Survive the full timer without waking the baby!
+            </div>
+            <div class="actions">
+              <button class="btn" id="startBtn">Start</button>
+              <button class="btn secondary" id="howBtn">How to play</button>
+            </div>
+          </div>
         </div>
-      </div>
 
+        <div id="pauseOverlay" class="overlay" style="display:none;">
+          <div class="card">
+            <div class="title">Paused</div>
+            <div class="subtitle">Swipe to give Whiskers a gentle push. Drop treats into the bowl to distract him.</div>
+            <div class="actions">
+              <button class="btn" id="resumeBtn">Resume</button>
+              <button class="btn secondary" id="restartBtn">Restart</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="endOverlay" class="overlay" style="display:none;">
+          <div class="card">
+            <div class="title" id="endTitle">Game Over</div>
+            <div class="subtitle" id="endMsg">The baby woke up!</div>
+            <div class="actions">
+              <button class="btn" id="againBtn">Play again</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="treatTray">
+          <div class="packet" id="packet">🍗 Treats</div>
+          <div class="hint">Drag a treat into the bowl (🎯 highlights when close)</div>
+        </div>
+        <div id="toast" class="toast">Treat added! Whiskers is distracted.</div>
+        <div id="treat" class="treat"></div>
+      </div>
     </div>
   </div>
 
-  <script>
-  (function(){
-    const canvas = document.getElementById('play');
-    const ctx = canvas.getContext('2d');
-    const scene = document.getElementById('scene');
-    const toyEl = document.getElementById('toy');
-    const baby = document.getElementById('baby');
-    const babySleep = document.getElementById('babySleep');
-    const babyAwake = document.getElementById('babyAwake');
-    const meterFill = document.getElementById('meterFill');
-    const timerEl = document.getElementById('timer');
-    const zzzEl = document.getElementById('zzz');
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
-    const overlay = document.getElementById('overlay');
-    const card = document.getElementById('card');
-    const title = document.getElementById('title');
-    const subtitle = document.getElementById('subtitle');
-    const startBtn = document.getElementById('startBtn');
-    const restartBtn = document.getElementById('restartBtn');
-    const treatBtn = document.getElementById('treatBtn');
-    const motionBtn = document.getElementById('motionBtn');
+    // ----- Core Setup -----
+    const canvas = document.getElementById('scene');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
 
-    let W=0, H=0, DPR=1; // canvas dims
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b0e13);
 
+    const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 200);
+    camera.position.set(0.6, 3.3, 6.2);
+
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x223344, 0.8);
+    scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+    dir.position.set(4,6,3);
+    dir.castShadow = true;
+    dir.shadow.mapSize.set(1024,1024);
+    scene.add(dir);
+
+    const shadowMat = new THREE.ShadowMaterial({ opacity: 0.22 });
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    // Floor (nursery rug)
+    const floorGeo = new THREE.CylinderGeometry(6.5, 6.5, 0.2, 48);
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x101623, metalness: 0.05, roughness: 0.9 });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.receiveShadow = true;
+    floor.position.y = -0.1;
+    scene.add(floor);
+
+    // ----- Low-poly Cot + Toy (goal) -----
+    const cot = new THREE.Group();
+    const cotBase = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.2, 1.2), new THREE.MeshStandardMaterial({ color: 0x394e6a, metalness: 0.1, roughness: 0.8 }));
+    cotBase.castShadow = cotBase.receiveShadow = true;
+    cotBase.position.y = 0.6;
+    cot.add(cotBase);
+    const mattress = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.25, 1.0), new THREE.MeshStandardMaterial({ color: 0xb4e1ff, metalness: 0.0, roughness: 1.0 }));
+    mattress.position.y = 0.85; mattress.castShadow = mattress.receiveShadow = true; cot.add(mattress);
+    // Rails
+    const railMat = new THREE.MeshStandardMaterial({ color: 0x587aa1, metalness: 0.15, roughness: 0.6 });
+    for (let i=0;i<10;i++){
+      const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.9,10), railMat);
+      rail.position.set(-1.1 + i*0.24, 1.1, -0.55); rail.castShadow = true; cot.add(rail);
+      const rail2 = rail.clone(); rail2.position.z = 0.55; cot.add(rail2);
+    }
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.1, 1.3), new THREE.MeshStandardMaterial({ color: 0x2b3a52 }));
+    frame.position.y = 1.2; frame.material.transparent = true; frame.material.opacity = 0.12; cot.add(frame);
+    cot.position.set(0,0, -2.4);
+    scene.add(cot);
+
+    // Dangling toy above cot
+    const toyGroup = new THREE.Group();
+    const string = new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,1.2,8), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+    string.position.y = 2.2; toyGroup.add(string);
+    const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.18,0), new THREE.MeshStandardMaterial({ color: 0xffc34d, emissive: 0x331c00 }));
+    star.position.y = 1.6; star.castShadow = true; toyGroup.add(star);
+    toyGroup.position.set(0,0,-2.4);
+    scene.add(toyGroup);
+
+    // ----- Bowl (lure target) -----
+    const bowl = new THREE.Group();
+    const bowlOuter = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 0.22, 32), new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.4 }));
+    const bowlInner = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 0.2, 32), new THREE.MeshStandardMaterial({ color: 0x11131a }));
+    bowlInner.position.y = 0.02; bowl.add(bowlOuter); bowl.add(bowlInner);
+    bowl.position.set(-1.6, 0.11, 1.2);
+    bowl.castShadow = bowl.receiveShadow = true;
+    scene.add(bowl);
+
+    // ----- Bells (hazards) -----
+    const bells = [];
+    function makeBell(x,z){
+      const g = new THREE.Group();
+      const top = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 10), new THREE.MeshStandardMaterial({ color: 0xd1d5db, metalness: 0.6, roughness: 0.25 }));
+      const lip = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.035, 10, 24), new THREE.MeshStandardMaterial({ color: 0xe5e7eb, metalness: 0.7, roughness: 0.3 }));
+      lip.rotation.x = Math.PI/2;
+      const clapper = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshStandardMaterial({ color: 0x9ca3af, metalness: 0.5, roughness: 0.5 }));
+      clapper.position.y = -0.05;
+      g.add(top); g.add(lip); g.add(clapper);
+      g.position.set(x, 0.16, z);
+      g.castShadow = true; g.receiveShadow = true;
+      scene.add(g);
+      bells.push({ g, r: 0.22, woke: false, bumpTime: 0 });
+    }
+    makeBell(-0.2, -0.6);
+    makeBell(1.4, -0.2);
+    makeBell(0.9, 1.5);
+
+    // ----- Whiskers (hero) -----
+    const whiskers = new THREE.Group();
+    // body
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 18, 14), new THREE.MeshStandardMaterial({ color: 0x3f3d56, roughness: 0.9 }));
+    body.scale.set(1.4, 1.0, 1.0); body.position.y = 0.35; body.castShadow = true; whiskers.add(body);
+    // head
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 18, 14), new THREE.MeshStandardMaterial({ color: 0x4b4a67, roughness: 0.85 }));
+    head.position.set(0.22, 0.58, 0); head.castShadow = true; whiskers.add(head);
+    // ears
+    const earGeo = new THREE.ConeGeometry(0.09, 0.14, 8);
+    const ear1 = new THREE.Mesh(earGeo, new THREE.MeshStandardMaterial({ color: 0x5b5a7b })); ear1.position.set(0.3,0.78,0.08); ear1.rotation.z = -0.3; whiskers.add(ear1);
+    const ear2 = ear1.clone(); ear2.position.z = -0.08; ear2.rotation.z = 0.3; whiskers.add(ear2);
+    // tail
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 0.6, 10), new THREE.MeshStandardMaterial({ color: 0x3f3d56 }));
+    tail.position.set(-0.45,0.6,0); tail.rotation.z = 1.1; whiskers.add(tail);
+    whiskers.position.set(-2.2, 0.05, -1.0);
+    whiskers.castShadow = whiskers.receiveShadow = true;
+    scene.add(whiskers);
+
+    // Simple shadow catcher circle under Whiskers
+    const catShadow = new THREE.Mesh(new THREE.CircleGeometry(0.32, 20), shadowMat);
+    catShadow.rotation.x = -Math.PI/2; catShadow.position.set(whiskers.position.x, 0.001, whiskers.position.z); scene.add(catShadow);
+
+    // ----- Game State -----
     const state = {
-      running:false,
-      over:false,
-      timeLeft:45, // seconds
-      last: 0,
-      noise: 6, // start calm
-      toy: {x:0, y:0, phase:0},
-      treat: {active:false, x:0, y:0, t:0},
-      cat: { x:0,y:0, vx:0,vy:0, size: 30, facing: 1, onGround: true, onRail:false, touchedToy:false }
+      running: false,
+      over: false,
+      time: 0,
+      duration: 60, // seconds to survive
+      wake: 0, // 0..100
+      treatAttract: 0, // frames remaining
+      bowlPulse: 0,
+      swipe: { start: null, t: 0 },
+      v: new THREE.Vector3(0.04, 0, 0.02), // Whiskers velocity
+      a: new THREE.Vector3(),
+      toyPos: new THREE.Vector3(0, 1.6, -2.4),
     };
 
-    // Utility
-    const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-    const lerp=(a,b,t)=>a+(b-a)*t;
-    const now=()=>performance.now()/1000;
-    const rand=(a,b)=>a+Math.random()*(b-a);
+    // ----- UI Elements -----
+    const startOverlay = document.getElementById('startOverlay');
+    const pauseOverlay = document.getElementById('pauseOverlay');
+    const endOverlay = document.getElementById('endOverlay');
+    const endTitle = document.getElementById('endTitle');
+    const endMsg = document.getElementById('endMsg');
+    const timeFill = document.getElementById('timeFill');
+    const wakeFill = document.getElementById('wakeFill');
+    const toast = document.getElementById('toast');
 
-    // Geometry helpers (based on scene size)
-    const FRONT_TOP_Y = ()=>H*0.64; // top of front rail
-    const FLOOR_Y = ()=>H*0.92;     // ground outside
-    const INTERIOR_TOP_Y = ()=>H*0.36;
-    const INTERIOR_BOTTOM_Y = ()=>H*0.71;
-    const LEFT_X = ()=>W*0.2; const RIGHT_X = ()=>W*0.8; // crib inner posts
+    // Buttons
+    document.getElementById('startBtn').onclick = () => start();
+    document.getElementById('howBtn').onclick = () => showToast('Swipe to nudge. Drag a treat into the bowl to distract Whiskers.');
+    document.getElementById('pauseBtn').onclick = () => pause();
+    document.getElementById('resumeBtn').onclick = () => resume();
+    document.getElementById('restartBtn').onclick = () => restart();
+    document.getElementById('againBtn').onclick = () => restart();
 
-    function fit(){
-      DPR = Math.min(2, window.devicePixelRatio || 1); // balance sharpness and perf
-      W = Math.floor(scene.clientWidth);
-      H = Math.floor(scene.clientHeight);
-      canvas.width = Math.floor(W*DPR);
-      canvas.height = Math.floor(H*DPR);
-      canvas.style.width = W+'px';
-      canvas.style.height = H+'px';
-      ctx.setTransform(DPR,0,0,DPR,0,0);
-      // place cat on floor, toy at top center (inside cot)
-      state.toy.x = W/2;
-      state.toy.y = H*0.18 + 10;
-      toyEl.style.left = (state.toy.x - toyEl.clientWidth/2) + 'px';
-      toyEl.style.top = (state.toy.y - toyEl.clientHeight/2) + 'px';
-      state.cat.x = W/2 + rand(-120, 120);
-      state.cat.y = FLOOR_Y();
-    }
-    window.addEventListener('resize', fit);
+    function showToast(msg){ toast.textContent = msg; toast.classList.add('show'); setTimeout(()=> toast.classList.remove('show'), 1600); }
 
-    // Prevent HUD taps from becoming swipes
-    function stopPointerPropagation(el){ ['pointerdown','pointerup','pointermove','touchstart','touchend','touchmove','click'].forEach(ev=>{ el.addEventListener(ev, e=>{ e.stopPropagation(); }, {passive:false}); }); }
-    ;[treatBtn, motionBtn, restartBtn, startBtn, card].forEach(stopPointerPropagation);
-
-    // Input: swipes fan the cat away
-    let pointerDown=false, pStart=null;
-    function pointer(e){ const rect = scene.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top }; }
-    scene.addEventListener('pointerdown', e=>{ if(overlay.style.display!=='' && overlay.style.display!=='none') return; pointerDown=true; pStart=pointer(e); });
-    scene.addEventListener('pointerup', e=>{
-      if(!pointerDown) return; pointerDown=false; const end=pointer(e);
-      const dx = end.x - pStart.x; const dy = end.y - pStart.y; const dist = Math.hypot(dx,dy);
-      if(dist>12){ const power = Math.min(1, dist/220); const gx = -dx * 0.05 * power; const gy = -dy * 0.04 * power; state.cat.vx += gx; state.cat.vy += gy; state.cat.facing = Math.sign(state.cat.vx||1); addNoise(6*power + (Math.abs(gy)>2? 2:0)); pulseZzz(); }
-    });
-
-    // Treat button -> rattle and lure (outside ground)
-    treatBtn.addEventListener('click', (e)=>{ e.preventDefault(); triggerTreat('button'); });
-
-    // Restart button
-    restartBtn.addEventListener('click', (e)=>{ e.preventDefault(); restart(); });
-
-    // Overlay start
-    startBtn.addEventListener('click', ()=>{ overlay.style.display='none'; resumeAudio(); startGame(); });
-
-    // Device motion & orientation
-    let motionEnabled=false, lastShake=0; const SHAKE_COOLDOWN=0.9; const SHAKE_THRESHOLD=18; // m/s^2
-    let lastBeta=null, lastGamma=null, lastTiltTime=0;
-
-    async function enableMotion(){
-      try{
-        if(typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function'){
-          const res = await DeviceMotionEvent.requestPermission(); if(res !== 'granted') throw new Error('Motion permission denied');
-        }
-        window.addEventListener('devicemotion', onMotion, {passive:true});
-        window.addEventListener('deviceorientation', onOrientation, {passive:true});
-        motionEnabled=true; motionBtn.textContent='Motion On'; motionBtn.disabled=true; motionBtn.classList.add('secondary');
-      }catch(err){ alert('Motion control not available or permission denied. You can still tap Treat.'); }
-    }
-    motionBtn.addEventListener('click', (e)=>{ e.preventDefault(); enableMotion(); });
-
-    function onMotion(e){ if(!state.running) return; const a = e.accelerationIncludingGravity || e.acceleration || {x:0,y:0,z:0}; const mag = Math.hypot(a.x||0, a.y||0, a.z||0); const t = now(); if(mag>SHAKE_THRESHOLD && (t-lastShake)>SHAKE_COOLDOWN){ lastShake=t; triggerTreat('shake'); } }
-    function onOrientation(e){ if(!state.running) return; const beta = e.beta || 0, gamma = e.gamma || 0; if(lastBeta===null){ lastBeta=beta; lastGamma=gamma; return; } const delta = Math.hypot(beta-lastBeta, gamma-lastGamma); lastBeta=beta; lastGamma=gamma; const t = now(); if(delta>22 && (t-lastTiltTime)>SHAKE_COOLDOWN){ lastTiltTime=t; triggerTreat('tilt'); } }
-
-    // GAME FLOW ---------------------------------------------------------
-    function startGame(){
-      fit(); setBabyAwake(false);
-      state.running=true; state.over=false; state.timeLeft=45; state.noise=6;
-      Object.assign(state.cat, {vx:0, vy:0, onGround:true, onRail:false, touchedToy:false});
-      state.treat.active=false; state.treat.t=0;
-      state.last = now();
-      setTimerDisplay(); updateMeter();
-      requestAnimationFrame(tick);
-    }
-
-    function restart(){ overlay.style.display='none'; resumeAudio(); startGame(); }
-
-    function setBabyAwake(on){ baby.classList.toggle('awake', !!on); babySleep.style.opacity = on? 0: 1; babyAwake.style.opacity = on? 1: 0; zzzEl.classList.toggle('awake', !!on); }
-
-    function gameOver(reason){
-      state.running=false; state.over=true; setBabyAwake(true);
-      if(reason==='fell'){
-        title.textContent = 'Baby woke up! 👶😱';
-        subtitle.innerHTML = 'Whiskers grabbed the toy and tumbled <em>into the cot</em>. Try gentler swipes or lure him away with Treat.';
-      }else if(reason==='noise'){
-        title.textContent = 'Too much noise!';
-        subtitle.innerHTML = 'All that rustling woke the baby. Keep movements softer and treats shorter.';
-      }else if(reason==='toy'){
-        title.textContent = 'Uh‑oh! Whiskers got the toy!';
-        subtitle.innerHTML = 'Keep him away from the center. Lure with Treat and fan him sideways.';
-      }else{
-        title.textContent = 'Game over';
-        subtitle.textContent = 'Try again?';
+    // ----- Input: Swipe to nudge -----
+    let touchId = null;
+    const touchStart = (x,y) => { state.swipe.start = { x, y, t: performance.now() }; };
+    const touchEnd = (x,y) => {
+      if (!state.swipe.start) return;
+      const dx = x - state.swipe.start.x;
+      const dy = y - state.swipe.start.y;
+      const dt = Math.max(1, performance.now() - state.swipe.start.t);
+      const speed = Math.hypot(dx,dy) / dt; // px per ms
+      if (speed > 0.5) { // quick swipe
+        // Map screen swipe to world XZ impulse relative to camera
+        const angle = Math.atan2(dx, dy); // screen coords: up is negative y
+        const strength = Math.min(0.18, speed * 0.22);
+        // Convert angle to world XZ (camera facing -Z)
+        const impulse = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle)).multiplyScalar(strength);
+        state.v.add(impulse);
+        pulseWhiskers();
       }
-      startBtn.textContent = 'Play Again';
-      overlay.style.display='grid';
+      state.swipe.start = null;
+    };
+
+    canvas.addEventListener('touchstart', (e)=>{ if (!state.running) return; const t = e.changedTouches[0]; touchId = t.identifier; touchStart(t.clientX, t.clientY); }, {passive:true});
+    canvas.addEventListener('touchend', (e)=>{ if (!state.running) return; const t = [...e.changedTouches].find(t=>t.identifier===touchId); if (t) touchEnd(t.clientX, t.clientY); }, {passive:true});
+    canvas.addEventListener('mousedown', (e)=>{ if (!state.running) return; touchStart(e.clientX, e.clientY); });
+    window.addEventListener('mouseup', (e)=>{ if (!state.running) return; touchEnd(e.clientX, e.clientY); });
+
+    function pulseWhiskers(){
+      whiskers.scale.set(1.02,1.02,1.02);
+      setTimeout(()=> whiskers.scale.set(1,1,1), 120);
     }
 
-    function win(){ title.textContent = 'You kept the baby asleep! ✨'; subtitle.textContent='Nice gentle paws!'; overlay.style.display='grid'; }
+    // ----- Drag Treats into Bowl -----
+    const packet = document.getElementById('packet');
+    const treat = document.getElementById('treat');
+    let dragging = false;
 
-    // NOISE & UI --------------------------------------------------------
-    function addNoise(n){ state.noise = clamp(state.noise + n, 0, 100); updateMeter(); }
-    function decayNoise(dt){ const rate = state.noise>60 ? 2.0 : 4.0; state.noise = clamp(state.noise - rate*dt, 0, 100); }
-    function updateMeter(){ meterFill.style.width = `${state.noise}%`; }
-    function setTimerDisplay(){ const t = Math.max(0, Math.ceil(state.timeLeft)); const m = String(Math.floor(t/60)).padStart(2,'0'); const s = String(t%60).padStart(2,'0'); timerEl.textContent = `${m}:${s}`; }
-
-    // AUDIO -------------------------------------------------------------
-    let AC=null; function getAC(){ if(!AC){ AC = new (window.AudioContext || window.webkitAudioContext)(); } return AC; }
-    function resumeAudio(){ try{ const ac=getAC(); if(ac.state==='suspended') ac.resume(); }catch(e){} }
-    function envGain(ac, duration, peak=0.9){ const g = ac.createGain(); g.gain.setValueAtTime(0, ac.currentTime); g.gain.linearRampToValueAtTime(peak, ac.currentTime + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + duration); return g; }
-    function playRattle(intensity=1){ try{ const ac = getAC(); const out = ac.createGain(); out.gain.value=0.7; out.connect(ac.destination); const grains = 5 + Math.floor(Math.random()*3); for(let i=0;i<grains;i++){ const t = ac.currentTime + i*0.045; const bufferSize = 2 * ac.sampleRate * 0.1; const buffer = ac.createBuffer(1, bufferSize, ac.sampleRate); const data = buffer.getChannelData(0); for(let j=0;j<bufferSize;j++){ data[j] = (Math.random()*2-1) * (0.5+0.5*Math.random()); } const src = ac.createBufferSource(); src.buffer = buffer; const g = envGain(ac, 0.12, 0.7*intensity); const hp = ac.createBiquadFilter(); hp.type='highpass'; hp.frequency.value = 1600 + Math.random()*800; src.connect(hp); hp.connect(g); g.connect(out); src.start(t); const o = ac.createOscillator(); o.type='triangle'; o.frequency.value = 1200 + Math.random()*600; const gb = envGain(ac, 0.08, 0.3*intensity); o.connect(gb); gb.connect(out); o.start(t+0.02); o.stop(t+0.15); src.stop(t+0.2);} }catch(e){} }
-    function playPurr(){ try{ const ac=getAC(); const o=ac.createOscillator(); o.type='sawtooth'; o.frequency.value=42; const lfo=ac.createOscillator(); lfo.frequency.value=24; const lfoGain=ac.createGain(); lfoGain.gain.value=9; lfo.connect(lfoGain); lfoGain.connect(o.frequency); const g=ac.createGain(); g.gain.value=0.0001; o.connect(g); g.connect(ac.destination); const t=ac.currentTime; g.gain.exponentialRampToValueAtTime(0.08, t+0.3); g.gain.exponentialRampToValueAtTime(0.0001, t+2.2); o.start(); lfo.start(); o.stop(t+2.3); lfo.stop(t+2.3);}catch(e){} }
-
-    function triggerTreat(source){
-      // lure appears at a side away from the cat, on outside ground
-      const left = state.cat.x > W/2; // place on opposite side
-      state.treat.active = true;
-      state.treat.x = left ? W*0.12 : W*0.88;
-      state.treat.y = FLOOR_Y() - 20 + rand(-20,20);
-      state.treat.t = 2.6; // seconds
-      playRattle(0.9); addNoise(10); pulseZzz();
+    function screenPosOf(obj){
+      const v = obj.position.clone();
+      obj.getWorldPosition(v);
+      v.project(camera);
+      const x = (v.x * 0.5 + 0.5) * innerWidth;
+      const y = (-v.y * 0.5 + 0.5) * innerHeight;
+      return { x, y };
     }
 
-    // Zzz pulse
-    let zPulse=0; function pulseZzz(){ zPulse = 1; }
+    function spawnTreat(){
+      const rect = packet.getBoundingClientRect();
+      treat.style.left = (rect.left + rect.width/2 - 14) + 'px';
+      treat.style.top = (rect.top - 38) + 'px';
+      treat.style.display = 'block';
+      dragging = true;
+    }
 
-    // PHYSICS & AI ------------------------------------------------------
-    const G = 1200; // gravity px/s^2
+    function endTreatDrag(x, y){
+      if (!dragging) return;
+      dragging = false; treat.style.display = 'none';
+      const b = screenPosOf(bowl);
+      const d = Math.hypot(x - b.x, y - b.y);
+      if (d < 80) { // success
+        state.treatAttract = 6 * 60; // frames (~6s)
+        state.bowlPulse = 60;
+        showToast('Treat added! Whiskers is distracted.');
+      } else {
+        showToast('Missed the bowl. Try again.');
+      }
+    }
 
+    function moveTreat(x,y){ if (!dragging) return; treat.style.left = (x-14)+'px'; treat.style.top = (y-14)+'px'; }
+
+    packet.addEventListener('touchstart', (e)=>{ e.preventDefault(); spawnTreat(); }, {passive:false});
+    window.addEventListener('touchmove', (e)=>{ if(!dragging) return; const t=e.touches[0]; moveTreat(t.clientX, t.clientY); }, {passive:true});
+    window.addEventListener('touchend', (e)=>{ const t=e.changedTouches[0]; endTreatDrag(t.clientX, t.clientY); }, {passive:true});
+    packet.addEventListener('mousedown', (e)=>{ e.preventDefault(); spawnTreat(); });
+    window.addEventListener('mousemove', (e)=> moveTreat(e.clientX, e.clientY));
+    window.addEventListener('mouseup', (e)=> endTreatDrag(e.clientX, e.clientY));
+
+    // ----- Helpers -----
+    function clamp(v, a, b){ return Math.min(b, Math.max(a, v)); }
+    function distXZ(a,b){ return Math.hypot(a.x-b.x, a.z-b.z); }
+
+    // ----- Game Flow -----
+    function start(){
+      startOverlay.style.display = 'none';
+      endOverlay.style.display = 'none';
+      state.running = true; state.over = false; state.time = 0; state.wake = 0; state.treatAttract = 0;
+    }
+    function pause(){ if(!state.running) return; state.running = false; pauseOverlay.style.display = 'grid'; }
+    function resume(){ state.running = true; pauseOverlay.style.display = 'none'; }
+    function restart(){
+      // reset positions
+      whiskers.position.set(-2.2, 0.05, -1.0); state.v.set(0.04,0,0.02);
+      bells.forEach(b=>{ b.woke=false; });
+      bowl.position.set(-1.6, 0.11, 1.2);
+      start();
+    }
+
+    // ----- Core Update Loop -----
+    const tmp = new THREE.Vector3();
     function update(dt){
-      // toy swing (inside)
-      state.toy.phase += dt*0.9; const swing = Math.sin(state.toy.phase)* (W*0.09);
-      const toyX = W/2 + swing; const toyY = state.toy.y; toyEl.style.transform = `translateZ(60px) translateX(${swing}px)`;
+      if (!state.running || state.over) return;
 
-      // treat timer decay
-      if(state.treat.active){ state.treat.t -= dt; if(state.treat.t<=0){ state.treat.active=false; } }
+      // timer
+      state.time += dt; const t = clamp(state.time / state.duration, 0, 1); timeFill.style.width = (t*100).toFixed(1)+'%';
+      if (state.time >= state.duration){ return win(); }
 
-      // Cat target: treat > toy center
-      const c = state.cat;
-      const targetX = state.treat.active ? state.treat.x : toyX;
-      const dx = targetX - c.x;
-      const desiredVX = clamp(dx*2.0, -220, 220);
-      c.vx = lerp(c.vx, desiredVX, 0.08);
-      c.facing = Math.sign(c.vx || c.facing);
+      // Attraction: treat vs toy
+      const target = tmp.set(0,0,0);
+      if (state.treatAttract > 0){
+        const bp = new THREE.Vector3(); bowl.getWorldPosition(bp); target.copy(bp);
+        state.treatAttract--; if (state.bowlPulse>0) state.bowlPulse--;
+      } else { target.set(state.toyPos.x,0,state.toyPos.z); }
 
-      // Jump logic
-      if(c.onGround && !state.treat.active && Math.abs(c.x - (LEFT_X()+RIGHT_X())/2) < (RIGHT_X()-LEFT_X())*0.4 && Math.random() < dt*0.9){
-        // jump towards rail
-        c.vy = -720 - Math.random()*80; c.onGround=false;
-      }
-      if(c.onRail && !state.treat.active && Math.abs(c.x - toyX) < 120 && Math.random() < dt*0.8){
-        // big leap toward toy
-        c.vy = -980 - Math.random()*60; c.onRail=false;
-        c.vx += clamp((toyX - c.x)*0.6, -240, 240);
-      }
+      // Simple steering towards target with slight wander
+      const cat = whiskers.position;
+      const desired = tmp.set(target.x - cat.x, 0, target.z - cat.z).normalize().multiplyScalar(0.06);
+      // Add wander
+      desired.x += (Math.sin(performance.now()*0.002) * 0.008);
+      desired.z += (Math.cos(performance.now()*0.0017) * 0.008);
+      state.a.copy(desired).sub(state.v).multiplyScalar(0.12);
+      state.v.add(state.a);
+      // friction
+      state.v.multiplyScalar(0.992);
+      // move
+      cat.add(state.v);
+      catShadow.position.set(cat.x, 0.001, cat.z);
 
-      // gravity
-      if(!c.onGround && !c.onRail){ c.vy += G*dt; }
+      // Bounds bounce
+      const r = 6.2; const d = Math.hypot(cat.x, cat.z);
+      if (d > r){ state.v.multiplyScalar(-0.6); whiskers.position.set(cat.x*(r/d), cat.y, cat.z*(r/d)); }
 
-      // integrate
-      c.x += c.vx*dt; c.y += c.vy*dt;
-
-      // ground bounds (outside)
-      if(c.y >= FLOOR_Y()){ if(!c.onGround){ addNoise(Math.min(10, Math.abs(c.vy)/70)); } c.y = FLOOR_Y(); c.vy=0; c.onGround=true; c.onRail=false; }
-
-      // landing on rail from above (falling)
-      const withinPosts = (c.x>LEFT_X() && c.x<RIGHT_X());
-      if(!c.onRail && !c.onGround && c.vy>0 && c.y >= FRONT_TOP_Y() && withinPosts){ c.y = FRONT_TOP_Y(); c.vy=0; c.onRail=true; }
-      // slip off rail edges
-      if(c.onRail && !withinPosts){ c.onRail=false; }
-
-      // rail friction movement
-      if(c.onRail){ c.vx = clamp(c.vx, -140, 140); }
-
-      // walls screen bounds
-      if(c.x < W*0.05){ c.x=W*0.05; c.vx=Math.abs(c.vx)*0.4; }
-      if(c.x > W*0.95){ c.x=W*0.95; c.vx=-Math.abs(c.vx)*0.4; }
-
-      // toy interaction
-      const headY = c.y - c.size*0.9; const headX = c.x + c.facing*6;
-      const dToy = Math.hypot(headX - toyX, headY - toyY);
-      if(dToy < 46 && !state.treat.active){
-        // touched toy
-        c.touchedToy = true; addNoise(18);
-        // nudge inward so he tends to fall into cot
-        c.vx += clamp((W/2 - c.x)*0.5, -180, 180);
-        c.vy = Math.max(c.vy, 280); // downward knock
+      // Bells collision
+      for (const b of bells){
+        const p = b.g.position; const dd = distXZ(p, cat);
+        if (dd < b.r + 0.25){
+          // bounce away and wake increase
+          const away = tmp.set(cat.x-p.x,0,cat.z-p.z).normalize().multiplyScalar(0.08);
+          state.v.add(away);
+          if (!b.woke){
+            bumpWake(10); b.woke = true; b.bumpTime = 32; setTimeout(()=> b.woke=false, 1200);
+          }
+        }
+        // tiny bell jiggle visual
+        if (b.bumpTime>0){ b.g.rotation.z = Math.sin(performance.now()*0.04)*0.15; b.bumpTime--; } else { b.g.rotation.z *= 0.9; }
       }
 
-      // Falling into cot after grabbing toy -> baby wakes
-      if(c.touchedToy){
-        const insideX = (c.x>LEFT_X() && c.x<RIGHT_X());
-        const insideY = (c.y>INTERIOR_TOP_Y() && c.y<INTERIOR_BOTTOM_Y());
-        if(insideX && insideY){ gameOver('fell'); }
+      // Reach toy? -> fall into cot -> lose
+      const toyXZ = new THREE.Vector3(state.toyPos.x,0,state.toyPos.z);
+      const dToy = distXZ(cat, toyXZ);
+      if (dToy < 0.4){
+        return lose('Whiskers reached the toy and fell into the cot! The baby woke up.');
       }
 
-      // noise & win timer
-      decayNoise(dt); if(state.noise>=100){ gameOver('noise'); }
-      state.timeLeft -= dt; setTimerDisplay(); if(state.timeLeft<=0){ state.timeLeft=0; setTimerDisplay(); state.running=false; playPurr(); win(); }
+      // Bowl pulse effect
+      bowl.scale.setScalar(1 + (state.bowlPulse>0 ? Math.sin(performance.now()*0.02)*0.06+0.1 : 0));
 
-      // zzz pulse anim
-      if(zPulse>0){ zPulse = Math.max(0, zPulse - dt*2.5); const lift = (1 - state.noise/100) * 6 + (zPulse>0 ? -6*zPulse : 0); zzzEl.style.transform = `translateX(-50%) translateZ(-60px) translateY(${lift}px)`; }
+      // Head look-at target
+      head.lookAt(target.x, head.position.y, target.z);
     }
 
-    // RENDER ------------------------------------------------------------
-    function drawCat(c){
-      const x=c.x, y=c.y; const s = c.size; const faceTilt = clamp(-c.vx*0.02, -6, 6);
-      ctx.save(); ctx.translate(x, y);
-      // shadow
-      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(0, 10, s*1.1, s*0.45, 0, 0, Math.PI*2); ctx.fill();
+    function bumpWake(amount){ state.wake = clamp(state.wake + amount, 0, 100); wakeFill.style.width = state.wake+'%'; if (state.wake >= 100){ lose('The bells rang too much and the baby woke up!'); } }
 
-      // body (oval)
-      ctx.translate(0, -s*0.6);
-      const grad = ctx.createLinearGradient(0, -s*1.1, 0, s*1.2); grad.addColorStop(0, getComputedStyle(document.documentElement).getPropertyValue('--cat2').trim()); grad.addColorStop(1, getComputedStyle(document.documentElement).getPropertyValue('--cat1').trim()); ctx.fillStyle = grad;
-      roundedEllipse(0, 0, s*1.15, s*0.95);
+    function win(){ state.running=false; state.over=true; endTitle.textContent='You did it!'; endMsg.textContent='You kept the baby asleep for the whole timer. Nicely done.'; endOverlay.style.display='grid'; }
+    function lose(msg){ state.running=false; state.over=true; endTitle.textContent='Game Over'; endMsg.textContent=msg; endOverlay.style.display='grid'; }
 
-      // back legs
-      ctx.fillStyle = '#e58e4c'; roundedEllipse(-s*0.4, s*0.45, s*0.38, s*0.22); roundedEllipse( s*0.4, s*0.45, s*0.38, s*0.22);
-      // front paws
-      roundedEllipse(-s*0.5, s*0.2, s*0.28, s*0.18); roundedEllipse( s*0.5, s*0.2, s*0.28, s*0.18);
-
-      // stripes
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--cat3').trim(); for(let i=-2;i<=2;i++){ const yy = i*8 - 8; ctx.beginPath(); ctx.ellipse(6, yy, 12, 4, 0.6, 0, Math.PI*2); ctx.fill(); }
-
-      // head
-      ctx.save(); ctx.translate(c.facing*8, -s*0.78); ctx.rotate(faceTilt*Math.PI/180); roundedEllipse(0,0, s*0.8, s*0.65);
-      // ears
-      ctx.fillStyle = '#e58e4c'; ear(-s*0.38,-s*0.28, -0.6); ear( s*0.38,-s*0.28, 0.6);
-      // inner ears
-      ctx.fillStyle = '#f7b199'; ear(-s*0.33,-s*0.25, -0.6, 0.6); ear( s*0.33,-s*0.25, 0.6, 0.6);
-      // eyes
-      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-8, -2, 6, 7, 0, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.ellipse( 8, -2, 6, 7, 0, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.ellipse(-6, -2, 2.5, 5, 0, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.ellipse( 6, -2, 2.5, 5, 0, 0, Math.PI*2); ctx.fill();
-      // nose
-      ctx.fillStyle = '#f4a1a1'; ctx.beginPath(); triangle(0, 4, 6, 5, Math.PI); ctx.fill();
-      // mouth
-      ctx.strokeStyle = '#f4a1a1'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(0,7); ctx.quadraticCurveTo(-4,10,-6,12); ctx.moveTo(0,7); ctx.quadraticCurveTo(4,10,6,12); ctx.stroke();
-      // whiskers
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth=1.4; for(let i=0;i<3;i++){ whisker(-6, 6+i*3, -22, 4+i*3); whisker( 6, 6+i*3,  22, 4+i*3); }
-      ctx.restore();
-
-      // tail (curved)
-      ctx.save(); ctx.translate(-c.facing* (s*0.95), -s*0.2); const wag = Math.sin(performance.now()/160) * 0.3; ctx.rotate(wag); roundedEllipse(0,0, s*1.0, s*0.28); ctx.restore();
-
-      ctx.restore();
-
-      function roundedEllipse(cx,cy, rx, ry){ ctx.beginPath(); ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2); ctx.fill(); }
-      function ear(ex,ey, rot, scale=1){ ctx.save(); ctx.translate(ex,ey); ctx.rotate(rot); ctx.scale(scale,scale); ctx.beginPath(); triangle(0,0, 16,14,-0.1); ctx.fill(); ctx.restore(); }
-      function triangle(x,y,w,h,rot){ ctx.save(); ctx.translate(x,y); ctx.rotate(rot); ctx.moveTo(0,-h/2); ctx.lineTo(-w/2,h/2); ctx.lineTo(w/2,h/2); ctx.closePath(); ctx.restore(); }
-      function whisker(x1,y1,x2,y2){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.quadraticCurveTo((x1+x2)/2, y1-6, x2,y2); ctx.stroke(); }
+    // ----- Render Loop -----
+    let last = performance.now();
+    function loop(){
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      update(dt);
+      renderer.render(scene, camera);
+      requestAnimationFrame(loop);
     }
+    loop();
 
-    function drawScene(){
-      const Wc=W, Hc=H; ctx.clearRect(0,0,Wc,Hc);
-      // subtle vignette
-      const g = ctx.createRadialGradient(Wc/2,Hc*0.4, 30, Wc/2,Hc*0.4, Math.max(Wc,Hc)); g.addColorStop(0,'rgba(255,255,255,0)'); g.addColorStop(1,'rgba(0,0,0,0.20)'); ctx.fillStyle=g; ctx.fillRect(0,0,Wc,Hc);
-      // draw cat & treat
-      drawCat(state.cat);
-      if(state.treat.active){ ctx.save(); ctx.translate(state.treat.x, state.treat.y); const r = 16 + Math.sin(performance.now()/120)*3; ctx.fillStyle = 'rgba(255,231,140,0.95)'; ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill(); ctx.fillStyle = 'rgba(255,200,80,0.65)'; ctx.beginPath(); ctx.arc(0,0,r*0.6,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+    // ----- Resize -----
+    function onResize(){
+      const w = innerWidth, h = innerHeight;
+      camera.aspect = w/h; camera.updateProjectionMatrix();
+      renderer.setSize(w,h);
     }
+    addEventListener('resize', onResize);
 
-    function tick(){ if(!state.running) return; const t = now(); const dt = Math.min(0.033, t - state.last); state.last=t; update(dt); drawScene(); requestAnimationFrame(tick); }
-
-    // kick off in paused state
-    fit();
-  })();
+    // Start in idle state
   </script>
 </body>
 </html>
