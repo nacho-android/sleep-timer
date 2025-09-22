@@ -1,968 +1,182 @@
-<!doctype html>
-
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Activity Timer</title>
-  <style>
-    :root{
-      --bg:#0f1115;          /* background */
-      --bg-2:#141823;        /* cards */
-      --text:#e6ecff;        /* primary text */
-      --muted:#9aa7c7;       /* secondary text */
-      --accent:#6ea8fe;      /* buttons */
-      --accent-2:#87d38c;    /* resume */
-      --danger:#ff6b6b;      /* delete/dismiss */
-      --ring:#6ea8fe;        /* running circle */
-      --ring-paused:#ffbe55; /* paused circle */
-      --ring-finished:#ff6b6b; /* finished circle */
-      --shadow: 0 10px 30px rgba(0,0,0,.35);
-      --radius: 18px;
-      --gap: 14px;
-      --flash-a:#ff1e56; /* flashing primary */
-      --flash-b:#ffe66d; /* flashing secondary */
-    }* { box-sizing: border-box; }
-html, body { height: 100%; }
-body{
-  margin:0;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
-  background: var(--bg);
-  color: var(--text);
-  -webkit-tap-highlight-color: transparent;
-}
-
-.app{ min-height:100svh; padding: env(safe-area-inset-top) env(safe-area-inset-right) calc(24px + env(safe-area-inset-bottom)) env(safe-area-inset-left); display:flex; align-items:center; justify-content:center; }
-.container{ width:min(960px, 100%); padding: clamp(14px, 2.5vw, 32px); }
-
-.card{ background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.08); border-radius:var(--radius); box-shadow:var(--shadow); padding: clamp(14px, 2vw, 22px); }
-
-.layout{ display:grid; grid-template-columns: 1.15fr .85fr; gap: clamp(14px, 2vw, 24px); }
-@media (max-width: 960px){ .layout{ grid-template-columns: 1fr; } }
-
-.headline { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 10px; }
-.title { font-weight: 700; letter-spacing:.3px; font-size: clamp(18px, 2.3vw, 22px); color: var(--text); }
-.subtle { color: var(--muted); font-size: .95rem; }
-
-/* Time Picker */
-.picker{ display:flex; gap: clamp(10px, 2vw, 16px); align-items:center; justify-content:center; padding: clamp(12px, 2vw, 18px); border-radius: calc(var(--radius) - 6px); background: var(--bg-2); border: 1px solid rgba(255,255,255,.06); }
-
-.wheel{ width: clamp(82px, 15vw, 128px); height: clamp(110px, 20vw, 160px); background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03)); border: 1px solid rgba(255,255,255,.08); border-radius: 14px; position: relative; display:flex; align-items:center; justify-content:center; overflow:hidden; touch-action: pan-y; }
-.wheel .label{ position:absolute; top:6px; right:10px; color:var(--muted); font-size:.8rem; letter-spacing:.2px; }
-.wheel .value{ font-variant-numeric: tabular-nums; font-weight: 800; font-size: clamp(34px, 7vw, 56px); line-height:1; user-select: none; }
-.wheel:before, .wheel:after{ content:""; position:absolute; left:0; right:0; height:30%; pointer-events:none; }
-.wheel:before{ top:0; background: linear-gradient(180deg, rgba(15,17,21, .9), rgba(15,17,21,0)); }
-.wheel:after{ bottom:0; background: linear-gradient(0deg, rgba(15,17,21,.9), rgba(15,17,21,0)); }
-
-.sep{ font-size: clamp(26px, 5vw, 40px); opacity:.75; font-weight:700; }
-
-.presets{ display:flex; gap: clamp(10px, 2vw, 16px); justify-content:center; padding-top: 10px; }
-.chip{ --size: clamp(54px, 9vw, 72px); width:var(--size); height:var(--size); display:grid; place-items:center; border-radius: 999px; background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); cursor:pointer; user-select:none; transition: transform .18s ease, background .25s ease, border-color .25s ease; font-weight:700; }
-.chip:hover{ transform: translateY(-2px); }
-.chip:active{ transform: translateY(0); }
-
-.controls{ display:flex; gap:12px; justify-content:center; align-items:center; padding-top: 12px; flex-wrap: wrap; }
-.btn{ appearance:none; border:none; border-radius: 12px; padding: 14px 18px; font-weight: 800; letter-spacing:.2px; font-size: 1.05rem; color:#0c1222; background: var(--accent); cursor:pointer; box-shadow: 0 6px 16px rgba(110,168,254,.38); transition: transform .15s ease, filter .2s ease, background .25s ease; }
-.btn:active{ transform: translateY(1px) scale(.995); }
-.btn.secondary{ background: transparent; color: var(--text); border:1px solid rgba(255,255,255,.16); box-shadow:none; }
-.btn.resume{ background: var(--accent-2); box-shadow: 0 6px 16px rgba(135,211,140,.35); }
-.btn.danger{ background: var(--danger); box-shadow: 0 6px 16px rgba(255,107,107,.35); color: #150b0b; }
-.btn.block{ width:100%; }
-
-/* Ring */
-.ring-wrap{ position:relative; width:min(560px, 82vw); aspect-ratio:1/1; margin: 6px auto 10px; }
-.ring{ position:absolute; inset:0; display:grid; place-items:center; }
-.ring svg{ width:100%; height:100%; filter: drop-shadow(0 6px 22px rgba(0,0,0,.35)); }
-.ring .back{ stroke: rgba(255,255,255,.08); }
-.ring .front{ stroke: var(--ring); transition: stroke .25s ease; }
-.ring.paused .front{ stroke: var(--ring-paused); }
-.ring.finished .front{ stroke: var(--ring-finished); }
-
-.time-big{ position:absolute; inset:0; display:grid; place-items:center; font-variant-numeric: tabular-nums; }
-.time-big .t{ font-size: clamp(36px, 8vw, 72px); font-weight: 800; letter-spacing: .6px; }
-.time-big .endAt{ margin-top:6px; color: var(--muted); font-weight:600; letter-spacing:.3px; }
-
-.state-row{ display:flex; justify-content:center; align-items:center; gap:10px; color: var(--muted); font-weight:600; padding-bottom:6px; }
-
-/* Settings */
-.settings-toggle{ position: fixed; left: 14px; bottom: 14px; background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius: 12px; padding: 10px 12px; display:flex; align-items:center; gap:8px; cursor:pointer; z-index: 40; box-shadow: var(--shadow); transition: background .25s ease, border-color .25s ease; }
-.settings-toggle:hover{ background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.2); }
-.settings-toggle .dot{ width:10px; height:10px; border-radius:999px; background: #f59e0b; display:none; }
-.settings-toggle.sync-warn .dot{ display:block; }
-
-.drawer{ position: fixed; left: 12px; bottom: calc(56px + env(safe-area-inset-bottom)); width: min(460px, 92vw); max-height: min(78svh, 720px); overflow:auto; background: var(--bg-2); border:1px solid rgba(255,255,255,.12); border-radius: 16px; padding: 14px; box-shadow: var(--shadow); transform-origin: left bottom; opacity:0; visibility:hidden; transform: translateY(12px) scale(.98); transition: opacity .22s ease, transform .22s ease, visibility .22s step-end; z-index: 41; }
-.drawer.open{ opacity:1; visibility:visible; transform: translateY(0) scale(1); transition: opacity .22s ease, transform .22s ease; }
-
-.section{ margin: 6px 2px 12px; padding: 12px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); }
-.section h3{ margin: 0 0 8px; font-size: 1rem; letter-spacing:.3px; }
-.grid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
-@media (max-width:520px){ .grid{ grid-template-columns: 1fr; } }
-label{ display:flex; flex-direction:column; gap:6px; font-size:.92rem; color: var(--muted); }
-input[type="text"], input[type="number"], input[type="password"], select{ width:100%; background: rgba(0,0,0,.28); color: var(--text); border:1px solid rgba(255,255,255,.18); border-radius:10px; padding: 11px 12px; font-size: .98rem; }
-input[type="color"]{ width: 100%; height: 40px; border-radius: 8px; border:1px solid rgba(255,255,255,.18); background: transparent; }
-.row{ display:flex; gap:10px; align-items:center; }
-.hint{ font-size:.85rem; color: var(--muted); }
-.lock-note{ margin:6px 0 0; color: var(--muted); font-size:.9rem; }
-
-.eye{ position:absolute; right:8px; top:50%; transform: translateY(-50%); background: none; border:none; color:var(--muted); cursor:pointer; font-size: 16px; }
-.rel{ position:relative; }
-
-.warning{ color:#fbbf24; }
-.success{ color:#86efac; }
-.error{ color:#f87171; }
-
-/* Flash overlay */
-.flash{ position: fixed; inset:0; pointer-events:none; opacity:0; mix-blend-mode: screen; z-index: 30; }
-.flash.active{ opacity:.65; }
-.flash.pulse{ animation: pulse 1.3s infinite; }
-.flash.strobe{ animation: strobe .25s infinite; }
-.flash .a{ position:absolute; inset:0; background: var(--flash-a); opacity:.8; }
-.flash .b{ position:absolute; inset:0; background: var(--flash-b); opacity:.5; }
-@keyframes pulse{ 0%,100%{ transform: scale(1); } 50%{ transform: scale(1.015); } }
-@keyframes strobe{ 0%, 50%, 100% { opacity:.15; } 25%, 75% { opacity:.85; } }
-
-/* Modals */
-.modal-backdrop{ position: fixed; inset:0; background: rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index: 50; }
-.modal-backdrop.show{ display:flex; }
-.modal{ background: var(--bg-2); border:1px solid rgba(255,255,255,.16); border-radius: 16px; padding: 16px; width:min(420px, 92vw); box-shadow: var(--shadow); }
-.modal h3{ margin:0 0 10px; }
-
-.hr{ height:1px; background: rgba(255,255,255,.1); margin:10px 0; }
-
-/* Small helpers */
-.hide{ display:none !important; }
-.mt8{ margin-top:8px; }
-.mt12{ margin-top:12px; }
-.mt16{ margin-top:16px; }
-
-  </style>
+  <link rel="stylesheet" href="style.css">
+  <!-- Firebase SDKs are loaded dynamically in script.js -->
 </head>
 <body>
-  <div class="app">
-    <div class="container">
-      <div class="headline">
-        <div class="title">Activity Timer</div>
-        <div class="subtle" id="stateLabel">Set your time</div>
-      </div><div class="layout">
-    <!-- Left: Set or Ring -->
-    <div class="card" id="leftCard">
-      <!-- SET VIEW -->
-      <div id="setView">
-        <div class="picker" aria-label="Set duration using scroll">
-          <div class="wheel" data-unit="h" tabindex="0">
-            <div class="label">HRS</div>
-            <div class="value" id="hVal">00</div>
-          </div>
-          <div class="sep">:</div>
-          <div class="wheel" data-unit="m" tabindex="0">
-            <div class="label">MIN</div>
-            <div class="value" id="mVal">02</div>
-          </div>
-          <div class="sep">:</div>
-          <div class="wheel" data-unit="s" tabindex="0">
-            <div class="label">SEC</div>
-            <div class="value" id="sVal">00</div>
-          </div>
-        </div>
+  <!-- Main container for timer configuration and countdown -->
+  <div id="app">
+    <!-- Settings button -->
+    <button id="settingsBtn" aria-label="Settings">
+      ⚙️
+      <span id="syncIndicator" class="hidden"></span>
+    </button>
 
-        <div class="presets" id="presetRow">
-          <div class=\"chip\" data-min=\"2\"><span class=\"chipLabel\"><span class=\"subtle\">min<\/span><br><span class=\"chipNum\">2<\/span><\/span><\/div>
-          <div class=\"chip\" data-min=\"5\"><span class=\"chipLabel\"><span class=\"subtle\">min<\/span><br><span class=\"chipNum\">5<\/span><\/span><\/div>
-          <div class=\"chip\" data-min=\"10\"><span class=\"chipLabel\"><span class=\"subtle\">min<\/span><br><span class=\"chipNum\">10<\/span><\/span><\/div>
-        </div>
-
-        <div class="controls mt8">
-          <button class="btn" id="startBtn">Start</button>
-          <button class="btn secondary" id="clearBtn" title="Reset to 00:00:00">Clear</button>
-        </div>
+    <!-- Timer setup area -->
+    <div id="setupContainer" class="view">
+      <!-- Scrollable time selectors -->
+      <div id="timeSelectors">
+        <div class="timeSelector" id="hoursSelector"></div>
+        <div class="timeSelector" id="minutesSelector"></div>
+        <div class="timeSelector" id="secondsSelector"></div>
       </div>
+      <!-- Preset buttons -->
+      <div id="presetContainer">
+        <button class="presetBtn" data-minutes="2">00:02:00</button>
+        <button class="presetBtn" data-minutes="5">00:05:00</button>
+        <button class="presetBtn" data-minutes="10">00:10:00</button>
+      </div>
+      <!-- Start button -->
+      <button id="startBtn" class="actionBtn">Start</button>
+    </div>
 
-      <!-- RUN/PAUSE/FINISH VIEW -->
-      <div id="activeView" class="hide">
-        <div class="ring-wrap">
-          <div class="ring" id="ring">
-            <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <circle class="back" cx="60" cy="60" r="54" stroke-width="8" fill="none" />
-              <circle class="front" id="ringFront" cx="60" cy="60" r="54" stroke-width="8" fill="none"
-                stroke-linecap="round" stroke-dasharray="339.292" stroke-dashoffset="0" />
-            </svg>
-          </div>
-          <div class="time-big">
-            <div class="t" id="timeLeft">00:00</div>
-            <div class="endAt" id="endAt">Ends ~ --:--</div>
-          </div>
-        </div>
-
-        <div class="state-row" id="stateRow">
-          <span id="stateSmall">Running</span>
-          <span id="overtime" class="hide">Overtime <span id="otVal">+00:00</span></span>
-        </div>
-
-        <div class="controls">
-          <button class="btn" id="pauseBtn">Pause</button>
-          <button class="btn resume hide" id="resumeBtn">Resume</button>
-          <button class="btn danger hide" id="deleteBtn">Delete</button>
-          <button class="btn hide" id="restartBtn">Restart</button>
-          <button class="btn danger hide" id="dismissBtn">Dismiss</button>
-        </div>
+    <!-- Countdown view -->
+    <div id="countdownContainer" class="view hidden">
+      <div id="progressRing">
+        <svg viewBox="0 0 200 200">
+          <circle id="progressBg" cx="100" cy="100" r="90"/>
+          <circle id="progressBar" cx="100" cy="100" r="90"/>
+        </svg>
+        <div id="timeRemaining">0:00</div>
+        <div id="endTime"></div>
+      </div>
+      <div id="activeButtons">
+        <button id="pauseResumeBtn" class="actionBtn">Pause</button>
+        <button id="deleteBtn" class="dangerBtn hidden">Delete</button>
       </div>
     </div>
 
-    <!-- Right: Tips / Settings prompt -->
-    <div class="card">
-      <div class="subtle">Quick tips</div>
-      <div style="margin-top:8px; line-height:1.6">
-        • Scroll the hour/min/sec to set a duration. <br>
-        • Tap a preset (2/5/10) to jump there. <br>
-        • Start → Pause/Resume; Delete appears while paused. <br>
-        • When it ends, you’ll hear an alarm and it starts counting up. Use <b>Restart</b> or <b>Dismiss</b>. <br>
-        • Open <b>Settings</b> (bottom‑left) to change sounds, colours, and sync via your ID.
+    <!-- Finished view -->
+    <div id="finishedContainer" class="view hidden">
+      <div id="finishedMessage">Time's up!</div>
+      <div id="elapsedTime">+0:00</div>
+      <div id="finishButtons">
+        <button id="restartBtn" class="actionBtn">Restart</button>
+        <button id="dismissBtn" class="dangerBtn">Dismiss</button>
       </div>
     </div>
-  </div>
-</div>
 
-  </div>  <!-- Flash overlay for finished -->  <div class="flash" id="flash">
-    <div class="a"></div>
-    <div class="b"></div>
-  </div>  <!-- Settings toggle -->  <button class="settings-toggle" id="settingsToggle" title="Settings">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="currentColor" stroke-width="1.6"/><path d="M19.4 15a1.4 1.4 0 0 0 .28 1.54l.03.03a2 2 0 1 1-2.83 2.83l-.03-.03A1.4 1.4 0 0 0 15 19.4c-.18 0-.37.02-.55.06l-.08.02a1.4 1.4 0 0 0-1.05.95l-.02.08c-.04.18-.06.37-.06.55a2 2 0 1 1-4 0c0-.18-.02-.37-.06-.55l-.02-.08a1.4 1.4 0 0 0-.95-1.05l-.08-.02c-.18-.04-.37-.06-.55-.06a1.4 1.4 0 0 0-1.54.28l-.03.03a2 2 0 1 1-2.83-2.83l.03-.03A1.4 1.4 0 0 0 4.6 15c0-.18-.02-.37-.06-.55l-.02-.08a1.4 1.4 0 0 0-.95-1.05l-.08-.02c-.18-.04-.37-.06-.55-.06a2 2 0 1 1 0-4c.18 0 .37-.02.55-.06l.08-.02c.48-.12.86-.5.98-.98l.02-.08c.04-.18.06-.37.06-.55 0-.39-.1-.76-.28-1.09l-.03-.06a2 2 0 1 1 2.83-2.83l.06.03c.33.18.7.28 1.09.28.18 0 .37-.02.55-.06l.08-.02c.48-.12.86-.5.98-.98l.02-.08c.04-.18.06-.37.06-.55a2 2 0 1 1 4 0c0 .18.02.37.06.55l.02.08c.12.48.5.86.98.98l.08.02c.18.04.37.06.55.06.39 0 .76-.1 1.09-.28l.06-.03a2 2 0 1 1 2.83 2.83l-.03.06c-.18.33-.28.7-.28 1.09 0 .18.02.37.06.55l.02.08c.12.48.5.86.98.98l.08.02c.18.04.37.06.55.06a2 2 0 1 1 0 4c-.18 0-.37.02-.55.06l-.08.02c-.48.12-.86.5-.98.98l-.02.08c-.04.18-.06.37-.06.55Z" stroke="currentColor" stroke-width="1.6"/></svg>
-    <span class="subtle">Settings</span>
-    <span class="dot" id="syncDot"></span>
-  </button>  <!-- Settings Drawer -->  <div class="drawer" id="settingsDrawer" aria-label="Settings">
-    <div class="section">
-      <h3>Sync & Identity</h3>
-      <div class="grid">
-        <label>ID
-          <div class="row">
-            <input type="text" id="idInput" placeholder="e.g. team‑retro‑room" />
-            <button class="btn" id="applyIdBtn" style="white-space:nowrap">Apply ID</button>
-          </div>
-          <div class="hint" id="idHint">This ID syncs settings & the current timer state across your devices.</div>
-        </label>
-        <label>Password (optional)
-          <div class="rel">
-            <input type="password" id="pwdInput" placeholder="Set or change…" autocomplete="new-password" />
-            <button class="eye" data-eye-for="pwdInput" title="Show/Hide">👁️</button>
-          </div>
-          <div class="hint">If set, settings can’t be edited without this password.</div>
-        </label>
+    <!-- Password overlay for pause protection -->
+    <div id="pauseOverlay" class="overlay hidden">
+      <div class="overlayContent">
+        <p>Enter pause password:</p>
+        <input type="password" id="pausePasswordInput" autocomplete="off"/>
+        <button id="pausePasswordSubmit" class="actionBtn">Submit</button>
       </div>
-      <div class="grid mt8">
-        <label>Pause‑Lock Password (optional)
-          <div class="rel">
-            <input type="password" id="pausePwdInput" placeholder="Require to pause…" autocomplete="new-password" />
-            <button class="eye" data-eye-for="pausePwdInput" title="Show/Hide">👁️</button>
+    </div>
+
+    <!-- Settings panel -->
+    <div id="settingsPanel" class="panel hidden">
+      <div id="settingsHeader">
+        <h2>Settings</h2>
+        <button id="closeSettings" aria-label="Close">×</button>
+      </div>
+      <div id="settingsContent">
+        <!-- Preset durations -->
+        <div class="settingGroup">
+          <label>Preset Durations (minutes)</label>
+          <div class="presetInputs">
+            <input type="number" id="preset1" min="0" max="999"/>
+            <input type="number" id="preset2" min="0" max="999"/>
+            <input type="number" id="preset3" min="0" max="999"/>
           </div>
-          <div class="hint">When set, entering this password is required to pause. The timer keeps running until entered.</div>
-        </label>
-        <div>
-          <button class="btn secondary mt16" id="lockSettingsBtn">Lock / Save Passwords</button>
-          <div class="lock-note" id="lockNote">Settings are currently <b id="lockState">unlocked</b>.</div>
+        </div>
+
+        <!-- Alarm sound selection -->
+        <div class="settingGroup">
+          <label for="alarmSelect">Alarm sound</label>
+          <select id="alarmSelect">
+            <option value="phone">Phone Tone</option>
+            <option value="alarm">Traditional Alarm</option>
+            <option value="beep">Beep Beep</option>
+            <option value="siren">Ambulance</option>
+            <option value="bird">Bird</option>
+            <option value="knock">Knocking</option>
+            <option value="clap">Clapping</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <!-- Colour customization -->
+        <div class="settingGroup">
+          <label>Colours</label>
+          <div class="colorInputs">
+            <div>
+              <label for="colorBg">Background</label>
+              <input type="color" id="colorBg"/>
+            </div>
+            <div>
+              <label for="colorAccent">Accent</label>
+              <input type="color" id="colorAccent"/>
+            </div>
+            <div>
+              <label for="colorText">Text</label>
+              <input type="color" id="colorText"/>
+            </div>
+          </div>
+        </div>
+
+        <!-- Flashing background -->
+        <div class="settingGroup">
+          <label>Background Flashing</label>
+          <select id="flashSelect">
+            <option value="none">None</option>
+            <option value="flash">Flash</option>
+            <option value="pulse">Pulse</option>
+          </select>
+          <input type="color" id="flashColor" value="#ff4444"/>
+        </div>
+
+        <!-- Vibration and notification toggles -->
+        <div class="settingGroup">
+          <label><input type="checkbox" id="vibrationToggle"/> Vibration</label>
+        </div>
+        <div class="settingGroup">
+          <label><input type="checkbox" id="notificationToggle"/> Notifications</label>
+        </div>
+
+        <!-- ID and passwords -->
+        <div class="settingGroup">
+          <label for="idInput">Sync ID</label>
+          <input type="text" id="idInput"/>
+        </div>
+        <div class="settingGroup">
+          <label for="passwordInput">Settings Password (optional)</label>
+          <div class="passwordWrapper">
+            <input type="password" id="passwordInput"/>
+            <button type="button" class="togglePw" data-target="passwordInput">👁️</button>
+          </div>
+        </div>
+        <div class="settingGroup">
+          <label for="pausePassword">Pause Password (optional)</label>
+          <div class="passwordWrapper">
+            <input type="password" id="pausePassword"/>
+            <button type="button" class="togglePw" data-target="pausePassword">👁️</button>
+          </div>
+        </div>
+
+        <!-- Reset settings -->
+        <div class="settingGroup">
+          <button id="resetSettings" class="dangerBtn">Reset to Defaults</button>
+        </div>
+        <!-- Sync status -->
+        <div class="settingGroup" id="syncStatus" class="hidden"></div>
+        <!-- About section -->
+        <div class="settingGroup about">
+          <h3>About</h3>
+          <p>This activity timer helps you manage tasks, workouts, study sessions and more. Scroll to set a custom duration or tap one of the presets. Configure alarms, colours, flash effects and more in settings. Synchronise timers across your devices using the sync ID.</p>
+          <p>During a countdown you can pause/resume or delete. When time's up, the timer will alert you with your selected sound, optional vibration and notifications. You can then restart or dismiss the session.</p>
         </div>
       </div>
-      <div class="hint mt8" id="syncStatus">Sync: <span class="success">OK</span></div>
-    </div><div class="section">
-  <h3>Presets</h3>
-  <div class="grid">
-    <label>Preset A (min)
-      <input type="number" id="pA" min="0" max="999" value="2" />
-    </label>
-    <label>Preset B (min)
-      <input type="number" id="pB" min="0" max="999" value="5" />
-    </label>
-    <label>Preset C (min)
-      <input type="number" id="pC" min="0" max="999" value="10" />
-    </label>
-    <div class="row" style="align-items:flex-end">
-      <button class="btn" id="applyPresets">Apply</button>
     </div>
   </div>
-</div>
 
-<div class="section">
-  <h3>Appearance</h3>
-  <div class="grid">
-    <label>Background
-      <input type="color" id="bgColor" value="#0f1115" />
-    </label>
-    <label>Text
-      <input type="color" id="textColor" value="#e6ecff" />
-    </label>
-    <label>Buttons
-      <input type="color" id="btnColor" value="#6ea8fe" />
-    </label>
-    <label>Ring (running)
-      <input type="color" id="ringColor" value="#6ea8fe" />
-    </label>
-    <label>Ring (paused)
-      <input type="color" id="ringPausedColor" value="#ffbe55" />
-    </label>
-    <label>Ring (finished)
-      <input type="color" id="ringFinishedColor" value="#ff6b6b" />
-    </label>
-  </div>
-</div>
-
-<div class="section">
-  <h3>Finish Effects</h3>
-  <div class="grid">
-    <label>Alarm sound
-      <select id="soundSelect">
-        <option value="phone">Phone tone</option>
-        <option value="alarm">Traditional alarm</option>
-        <option value="beep">Beep beep</option>
-        <option value="ambulance">Ambulance</option>
-        <option value="bird">Bird</option>
-        <option value="knock">Knocking</option>
-        <option value="clap">Clapping</option>
-        <option value="other">Other (simple)</option>
-      </select>
-    </label>
-    <label>Vibration
-      <select id="vibrateSelect">
-        <option value="on">On</option>
-        <option value="off">Off</option>
-      </select>
-    </label>
-    <label>Notification
-      <select id="notifySelect">
-        <option value="on">On</option>
-        <option value="off">Off</option>
-      </select>
-    </label>
-    <label>Background flash
-      <select id="flashSelect">
-        <option value="none">None</option>
-        <option value="pulse">Pulse</option>
-        <option value="strobe">Strobe</option>
-      </select>
-    </label>
-    <label>Flash Colour A
-      <input type="color" id="flashA" value="#ff1e56" />
-    </label>
-    <label>Flash Colour B
-      <input type="color" id="flashB" value="#ffe66d" />
-    </label>
-  </div>
-</div>
-
-<div class="section">
-  <h3>Danger Zone</h3>
-  <button class="btn danger" id="resetBtn">Reset all settings</button>
-  <div class="hint">You’ll be asked to confirm; this can’t be undone.</div>
-</div>
-
-<div class="section">
-  <h3>About</h3>
-  <div class="hint">
-    <b>Activity Timer</b> — a minimal, device‑agnostic timer designed for workshops, workouts, and focus sprints. Scroll the numbers to set a time, use presets for one‑taps, and customize colours and sounds. Sync your settings and timer state with a simple ID across your devices.
-    <div class="hr"></div>
-    <b>Instructions</b><br>
-    1) Set time by scrolling H/M/S or tap a preset. 2) Press Start. 3) Pause/Resume as needed. 4) When time’s up, alarm + optional vibration and flashing; timer counts up. Use Restart/Dismiss. Open Settings to tweak appearance, sounds, and sync.
-  </div>
-</div>
-
-  </div>  <!-- Modal: Password Prompt -->  <div class="modal-backdrop" id="pwdModal">
-    <div class="modal">
-      <h3 id="pwdModalTitle">Enter password</h3>
-      <div class="rel">
-        <input type="password" id="pwdModalInput" placeholder="Password" />
-        <button class="eye" data-eye-for="pwdModalInput" title="Show/Hide">👁️</button>
-      </div>
-      <div class="row mt12">
-        <button class="btn" id="pwdModalOk">OK</button>
-        <button class="btn secondary" id="pwdModalCancel">Cancel</button>
-        <div class="hint" id="pwdModalError"></div>
-      </div>
-    </div>
-  </div>  <!-- Modal: Confirm Reset -->  <div class="modal-backdrop" id="confirmModal">
-    <div class="modal">
-      <h3>Reset all settings?</h3>
-      <div class="hint">This returns everything to defaults and can’t be undone.</div>
-      <div class="row mt12">
-        <button class="btn danger" id="confirmYes">Yes, reset</button>
-        <button class="btn secondary" id="confirmNo">Cancel</button>
-      </div>
-    </div>
-  </div>  <!-- Firebase (Compat for simplicity). Leave as-is; fill config below. -->  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>  <script>
-  // ====== Utilities ======
-  const $ = sel => document.querySelector(sel);
-  const $$ = sel => Array.from(document.querySelectorAll(sel));
-  const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
-  const pad2 = n => String(n).padStart(2,'0');
-  const now = () => Date.now();
-  const deepClone = (obj) => (window.structuredClone ? structuredClone(obj) : JSON.parse(JSON.stringify(obj)));
-  const fmt = ms => {
-    const sign = ms < 0 ? '-' : '';
-    ms = Math.abs(ms);
-    const s = Math.floor(ms/1000);
-    const h = Math.floor(s/3600);
-    const m = Math.floor((s%3600)/60);
-    const sec = s%60;
-    return h>0 ? `${sign}${pad2(h)}:${pad2(m)}:${pad2(sec)}` : `${sign}${pad2(m)}:${pad2(sec)}`;
-  };
-  const endTimeStr = t => {
-    const d = new Date(t);
-    return pad2(d.getHours()) + ':' + pad2(d.getMinutes());
-  };
-  const genId = () => 'id-' + Math.random().toString(36).slice(2,7) + '-' + Math.random().toString(36).slice(2,7);
-  const sleep = ms => new Promise(r=>setTimeout(r, ms));
-
-  // Crypto hash (hex SHA-256)
-  async function sha256Hex(s){
-    const enc = new TextEncoder().encode(s);
-    const buf = await crypto.subtle.digest('SHA-256', enc);
-    return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
-  }
-
-  // ====== Persistent & Sync ======
-  const LS_KEY = 'activity-timer-v1';
-  const defaultSettings = {
-    presets: [2,5,10],
-    colors: {
-      bg: '#0f1115', text:'#e6ecff', btn:'#6ea8fe', ring:'#6ea8fe', ringPaused:'#ffbe55', ringFinished:'#ff6b6b',
-      flashA:'#ff1e56', flashB:'#ffe66d'
-    },
-    sound: 'phone', vibrate: true, notify: true, flash:'none',
-    pwdHash: '', pauseHash: ''
-  };
-  let store = { id: null, settings: deepClone(defaultSettings), state: null };
-  let db = null; let fbReady=false; let syncError=false; let lastRemote = null; let selfToken = Math.random().toString(36).slice(2);
-
-  function saveLocal(){
-    localStorage.setItem(LS_KEY, JSON.stringify({id: store.id, settings: store.settings}));
-  }
-  function loadLocal(){
-    const raw = localStorage.getItem(LS_KEY);
-    if(raw){
-      try{ const d = JSON.parse(raw); store.id = d.id || null; store.settings = Object.assign(deepClone(defaultSettings), d.settings||{}); }catch(e){}
-    }
-    if(!store.id){ store.id = genId(); saveLocal(); }
-  }
-
-  // ====== Firebase Init ======
-  async function initFirebase(){
-    try{
-      const firebaseConfig = {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-        databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_PROJECT_ID.appspot.com",
-        messagingSenderId: "YOUR_SENDER_ID",
-        appId: "YOUR_APP_ID"
-      };
-      if(firebaseConfig.apiKey.includes('YOUR_')){ fbReady=false; syncError=true; updateSyncUI(); return; }
-      const app = firebase.initializeApp(firebaseConfig);
-      db = firebase.database(app);
-      fbReady = true;
-    }catch(e){ console.warn('Firebase init failed', e); fbReady=false; syncError=true; updateSyncUI(); }
-  }
-
-  function refFor(id){ return db.ref('timers/'+id); }
-
-  async function syncLoad(id){
-    if(!fbReady) return;
-    try{
-      const snap = await refFor(id).get();
-      if(snap.exists()){
-        const data = snap.val();
-        if(data.settings){ store.settings = Object.assign(deepClone(defaultSettings), data.settings); applySettingsToUI(); applyColors(); }
-        if(data.state){ restoreRemoteState(data.state); }
-      }else{
-        // create new with current
-        await refFor(id).set({ settings: store.settings, state: null, lastBy: selfToken, updatedAt: now() });
-      }
-      syncError=false; updateSyncUI(); saveLocal();
-    }catch(e){ console.warn('syncLoad failed', e); syncError=true; updateSyncUI(); }
-  }
-  async function syncSave(part){
-    if(!fbReady || !store.id) return;
-    try{
-      await refFor(store.id).update({ ...part, lastBy: selfToken, updatedAt: now() });
-      syncError=false; updateSyncUI();
-    }catch(e){ console.warn('syncSave failed', e); syncError=true; updateSyncUI(); }
-  }
-  function listenRemote(){
-    if(!fbReady || !store.id) return;
-    refFor(store.id).off();
-    refFor(store.id).on('value', snap=>{
-      const v = snap.val();
-      if(!v || v.lastBy === selfToken) return; // ignore own writes
-      if(v.settings){ store.settings = Object.assign(deepClone(defaultSettings), v.settings); applySettingsToUI(); applyColors(); }
-      if(v.state){ restoreRemoteState(v.state); }
-    }, err=>{ syncError=true; updateSyncUI(); });
-  }
-
-  function updateSyncUI(){
-    $('#syncStatus').innerHTML = `Sync: ${syncError? '<span class="warning">Issue</span>':'<span class="success">OK</span>'}`;
-    $('#settingsToggle').classList.toggle('sync-warn', !!syncError && !$('#settingsDrawer').classList.contains('open'));
-  }
-
-  // ====== Timer Engine ======
-  const ringCircumference = 2 * Math.PI * 54; // matches SVG r=54
-  let timer = {
-    mode: 'set', durationMs: 120000, startAt: 0, endAt: 0, pauseRemain: 0, raf: 0, lastTick: 0, overtimeMs: 0
-  };
-
-  function setMode(m){ timer.mode = m; updateViews(); }
-
-  function updateViews(){
-    const isActive = timer.mode !== 'set';
-    $('#setView').classList.toggle('hide', isActive);
-    $('#activeView').classList.toggle('hide', !isActive);
-    $('#ring').classList.toggle('paused', timer.mode==='paused');
-    $('#ring').classList.toggle('finished', timer.mode==='finished');
-
-    $('#pauseBtn').classList.toggle('hide', !(timer.mode==='running'));
-    $('#resumeBtn').classList.toggle('hide', !(timer.mode==='paused'));
-    $('#deleteBtn').classList.toggle('hide', !(timer.mode==='paused'));
-    $('#restartBtn').classList.toggle('hide', !(timer.mode==='finished'));
-    $('#dismissBtn').classList.toggle('hide', !(timer.mode==='finished'));
-
-    $('#overtime').classList.toggle('hide', !(timer.mode==='finished'));
-
-    const label = timer.mode==='set' ? 'Set your time' : (timer.mode==='running' ? 'Counting down' : (timer.mode==='paused' ? 'Paused' : 'Finished'));
-    $('#stateLabel').textContent = label;
-    $('#stateSmall').textContent = label;
-  }
-
-  function applyRing(progress){
-    // progress: 1 -> full time remaining; 0 -> finished
-    const offset = ringCircumference * (1 - progress);
-    $('#ringFront').setAttribute('stroke-dasharray', ringCircumference.toFixed(3));
-    $('#ringFront').setAttribute('stroke-dashoffset', offset.toFixed(3));
-  }
-
-  function calcDurationFromPicker(){
-    const h = Number($('#hVal').textContent);
-    const m = Number($('#mVal').textContent);
-    const s = Number($('#sVal').textContent);
-    return ((h*3600)+(m*60)+s)*1000;
-  }
-
-  function setPickerFromMs(ms){
-    const s = Math.floor(ms/1000);
-    const h = Math.floor(s/3600); const m = Math.floor((s%3600)/60); const sec = s%60;
-    $('#hVal').textContent = pad2(h); $('#mVal').textContent = pad2(m); $('#sVal').textContent = pad2(sec);
-  }
-
-  function startTimer(){
-    timer.durationMs = calcDurationFromPicker();
-    if(timer.durationMs <= 0){ return; }
-    timer.startAt = now();
-    timer.endAt = timer.startAt + timer.durationMs;
-    timer.pauseRemain = 0; timer.overtimeMs = 0;
-    setMode('running');
-    tick();
-    syncSave({ state: exportState() });
-  }
-
-  function pauseTimer(){
-    const remain = Math.max(0, timer.endAt - now());
-    timer.pauseRemain = remain;
-    cancelAnimationFrame(timer.raf);
-    setMode('paused');
-    syncSave({ state: exportState() });
-  }
-
-  function resumeTimer(){
-    timer.startAt = now();
-    timer.endAt = timer.startAt + (timer.pauseRemain || timer.durationMs);
-    timer.pauseRemain = 0;
-    setMode('running');
-    tick();
-    syncSave({ state: exportState() });
-  }
-
-  function deleteTimer(){
-    cancelAnimationFrame(timer.raf);
-    setMode('set');
-    $('#timeLeft').textContent = fmt(timer.durationMs);
-    $('#endAt').textContent = 'Ends ~ --:--';
-    applyRing(1);
-    stopEffects();
-    syncSave({ state: null });
-  }
-
-  function finishTimer(){
-    setMode('finished');
-    triggerEffects();
-    syncSave({ state: exportState() });
-  }
-
-  function restartTimer(){
-    stopEffects();
-    timer.startAt = now();
-    timer.endAt = timer.startAt + timer.durationMs;
-    timer.overtimeMs = 0;
-    setMode('running');
-    tick();
-    syncSave({ state: exportState() });
-  }
-
-  function tick(){
-    const t = now();
-    const remain = timer.endAt - t;
-    if(remain <= 0){
-      $('#timeLeft').textContent = '00:00';
-      $('#endAt').textContent = 'Ends ~ ' + endTimeStr(timer.endAt);
-      applyRing(0);
-      cancelAnimationFrame(timer.raf);
-      if(timer.mode!== 'finished'){ finishTimer(); }
-      // Overtime ticker
-      const loop = ()=>{
-        if(timer.mode!=='finished') return;
-        timer.overtimeMs = now() - timer.endAt;
-        $('#otVal').textContent = '+' + fmt(timer.overtimeMs);
-        requestAnimationFrame(loop);
-      };
-      requestAnimationFrame(loop);
-      return;
-    }
-    const progress = remain / timer.durationMs;
-    $('#timeLeft').textContent = fmt(remain);
-    $('#endAt').textContent = 'Ends ~ ' + endTimeStr(timer.endAt);
-    applyRing(progress);
-    timer.raf = requestAnimationFrame(tick);
-  }
-
-  function exportState(){
-    return {
-      mode: timer.mode,
-      durationMs: timer.durationMs,
-      startAt: timer.startAt,
-      endAt: timer.endAt,
-      pauseRemain: timer.pauseRemain,
-      overtimeMs: timer.overtimeMs,
-      who: selfToken,
-    };
-  }
-  function restoreRemoteState(s){
-    if(!s){ deleteTimer(); return; }
-    timer.durationMs = s.durationMs || timer.durationMs;
-    timer.startAt = s.startAt || 0;
-    timer.endAt = s.endAt || 0;
-    timer.pauseRemain = s.pauseRemain || 0;
-    timer.overtimeMs = s.overtimeMs || 0;
-
-    // derive mode based on times
-    const t = now();
-    if(s.mode==='running'){
-      if(s.endAt && s.endAt>t){ setMode('running'); tick(); }
-      else { setMode('finished'); triggerEffects(); }
-    }else if(s.mode==='paused'){
-      setMode('paused');
-      $('#timeLeft').textContent = fmt(timer.pauseRemain||timer.durationMs);
-      $('#endAt').textContent = 'Ends ~ ' + endTimeStr(t + (timer.pauseRemain||0));
-      const p = (timer.pauseRemain||timer.durationMs) / timer.durationMs; applyRing(p);
-    }else if(s.mode==='finished'){
-      setMode('finished'); triggerEffects();
-    }else{ deleteTimer(); }
-  }
-
-  // ====== UI: Picker Wheels (scroll/drag to change) ======
-  function attachWheel(el, max){
-    let valEl = el.querySelector('.value');
-    let lastY = null; let acc = 0;
-    function set(v){ v = clamp(v, 0, max); valEl.textContent = pad2(v); }
-    function get(){ return Number(valEl.textContent); }
-    el.addEventListener('wheel', e=>{ e.preventDefault(); const d = Math.sign(e.deltaY); set(get()-d); updateStartFromPicker(); }, {passive:false});
-    el.addEventListener('pointerdown', e=>{ lastY = e.clientY; el.setPointerCapture(e.pointerId); });
-    el.addEventListener('pointermove', e=>{ if(lastY==null) return; const dy=e.clientY-lastY; if(Math.abs(dy)>14){ const steps = Math.round(dy/14); set(get()-steps); lastY=e.clientY; updateStartFromPicker(); } });
-    el.addEventListener('pointerup', ()=>{ lastY=null; });
-    // Keyboard up/down
-    el.addEventListener('keydown', e=>{ if(e.key==='ArrowUp'){ set(get()+1); updateStartFromPicker(); } else if(e.key==='ArrowDown'){ set(get()-1); updateStartFromPicker(); } });
-  }
-  function updateStartFromPicker(){
-    const ms = calcDurationFromPicker();
-    $('#timeLeft').textContent = fmt(ms);
-    const p = 1; applyRing(p);
-  }
-
-  // ====== Finish Effects: audio + vibration + flash + notification ======
-  let acx=null, alarmStop=null; let flashActive=false;
-  function ensureAC(){ if(!acx) acx = new (window.AudioContext||window.webkitAudioContext)(); }
-  function stopEffects(){ if(alarmStop){ alarmStop(); alarmStop=null; } setFlash('none'); document.title='Activity Timer'; }
-
-  function setFlash(mode){
-    const el = $('#flash');
-    el.classList.remove('pulse','strobe','active');
-    if(mode==='none'){ return; }
-    el.classList.add(mode, 'active');
-  }
-
-  function triggerEffects(){
-    const s = store.settings;
-    if(s.flash && s.flash!=='none'){ setFlash(s.flash); }
-    if(s.vibrate && 'vibrate' in navigator){ navigator.vibrate([200,120,200,120,400]); }
-    if(s.notify){
-      if('Notification' in window && Notification.permission==='granted') new Notification('Time's up!', { body: 'Your timer finished. Tap to return.', tag: 'activity-timer' });
-      else if('Notification' in window && Notification.permission!=='denied'){ Notification.requestPermission().then(p=>{ if(p==='granted') new Notification('Time\'s up!', { body:'Your timer finished.', tag:'activity-timer' }); }); }
-    }
-    playAlarm(s.sound);
-    document.title = '⏰ Time\'s up!';
-  }
-
-  function playAlarm(kind){
-    ensureAC();
-    const ctx = acx;
-    const master = ctx.createGain(); master.gain.value=.2; master.connect(ctx.destination);
-    let alive=true; alarmStop=()=>{ alive=false; master.disconnect(); };
-
-    const nowt = ctx.currentTime;
-    function beep(freq, dur=.25, type='sine', vol=.8){
-      const o = ctx.createOscillator(); const g=ctx.createGain();
-      o.type=type; o.frequency.setValueAtTime(freq, ctx.currentTime); o.connect(g); g.connect(master);
-      g.gain.setValueAtTime(0, ctx.currentTime);
-      g.gain.linearRampToValueAtTime(vol, ctx.currentTime+.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+dur);
-      o.start(); o.stop(ctx.currentTime+dur+.02);
-    }
-    function patternPhone(){
-      // ring… ring…
-      let t=0; const tick=()=>{ if(!alive) return; beep(440,.6,'sine',.6); setTimeout(()=>{ if(!alive) return; beep(660,.6,'sine',.6); }, 200);
-        setTimeout(tick, 1600);
-      }; tick();
-    }
-    function patternAlarm(){
-      let on=true; const tick=()=>{ if(!alive) return; beep(on?880:440,.25,'square',.7); on=!on; setTimeout(tick, 260); }; tick();
-    }
-    function patternBeep(){ let t=true; const tick=()=>{ if(!alive) return; beep(t?880:660,.18,'sine',.7); t=!t; setTimeout(tick, 260); }; tick(); }
-    function patternAmbulance(){ let a=true; const tick=()=>{ if(!alive) return; beep(a?700:900,.5,'sawtooth',.45); a=!a; setTimeout(tick, 540); }; tick(); }
-    function noiseHit(){ const buf=ctx.createBuffer(1, ctx.sampleRate*.2, ctx.sampleRate); const data=buf.getChannelData(0); for(let i=0;i<data.length;i++) data[i]=(Math.random()*2-1)*Math.exp(-15*i/data.length); const s=ctx.createBufferSource(); const g=ctx.createGain(); g.gain.value=.6; s.buffer=buf; s.connect(g); g.connect(master); s.start(); }
-    function patternBird(){ let c=0; const tick=()=>{ if(!alive) return; beep(1400+Math.random()*400,.07,'sine',.6); setTimeout(()=>beep(1800+Math.random()*500,.08,'sine',.5),90); if(++c%4===0) setTimeout(noiseHit,60); setTimeout(tick, 360); }; tick(); }
-    function patternKnock(){ const tick=()=>{ if(!alive) return; beep(180,.08,'triangle',.7); setTimeout(()=>beep(180,.08,'triangle',.6),160); setTimeout(tick, 1200); }; tick(); }
-    function patternClap(){ const tick=()=>{ if(!alive) return; noiseHit(); setTimeout(tick, 900); }; tick(); }
-
-    switch(kind){
-      case 'phone': patternPhone(); break;
-      case 'alarm': patternAlarm(); break;
-      case 'beep': patternBeep(); break;
-      case 'ambulance': patternAmbulance(); break;
-      case 'bird': patternBird(); break;
-      case 'knock': patternKnock(); break;
-      case 'clap': patternClap(); break;
-      default: patternBeep();
-    }
-  }
-
-  // ====== Settings Handling ======
-  function applyColors(){
-    const c = store.settings.colors;
-    document.documentElement.style.setProperty('--bg', c.bg);
-    document.documentElement.style.setProperty('--text', c.text);
-    document.documentElement.style.setProperty('--accent', c.btn);
-    document.documentElement.style.setProperty('--ring', c.ring);
-    document.documentElement.style.setProperty('--ring-paused', c.ringPaused);
-    document.documentElement.style.setProperty('--ring-finished', c.ringFinished);
-    document.documentElement.style.setProperty('--flash-a', c.flashA);
-    document.documentElement.style.setProperty('--flash-b', c.flashB);
-  }
-
-  function applySettingsToUI(){
-    // presets
-    const [a,b,c] = store.settings.presets;
-    $('#pA').value=a; $('#pB').value=b; $('#pC').value=c;
-    const chips = $$('#presetRow .chip');
-    if(chips[0]){ chips[0].dataset.min=a; const n=chips[0].querySelector('.chipNum'); if(n) n.textContent=a; }
-    if(chips[1]){ chips[1].dataset.min=b; const n=chips[1].querySelector('.chipNum'); if(n) n.textContent=b; }
-    if(chips[2]){ chips[2].dataset.min=c; const n=chips[2].querySelector('.chipNum'); if(n) n.textContent=c; }
-
-    // colors
-    const cs = store.settings.colors;
-    $('#bgColor').value=cs.bg; $('#textColor').value=cs.text; $('#btnColor').value=cs.btn; $('#ringColor').value=cs.ring; $('#ringPausedColor').value=cs.ringPaused; $('#ringFinishedColor').value=cs.ringFinished; $('#flashA').value=cs.flashA; $('#flashB').value=cs.flashB;
-
-    // effects
-    $('#soundSelect').value = store.settings.sound;
-    $('#vibrateSelect').value = store.settings.vibrate ? 'on':'off';
-    $('#notifySelect').value = store.settings.notify ? 'on':'off';
-    $('#flashSelect').value = store.settings.flash;
-
-    // ids
-    $('#idInput').value = store.id || '';
-
-    // lock state
-    $('#lockState').textContent = store.settings.pwdHash ? 'locked' : 'unlocked';
-  }
-
-  function readSettingsFromUI(){
-    store.settings.presets = [Number($('#pA').value||0), Number($('#pB').value||0), Number($('#pC').value||0)].map(v=>clamp(v,0,999));
-    store.settings.colors = {
-      bg: $('#bgColor').value, text: $('#textColor').value, btn: $('#btnColor').value, ring: $('#ringColor').value, ringPaused: $('#ringPausedColor').value, ringFinished: $('#ringFinishedColor').value, flashA: $('#flashA').value, flashB: $('#flashB').value
-    };
-    store.settings.sound = $('#soundSelect').value;
-    store.settings.vibrate = $('#vibrateSelect').value==='on';
-    store.settings.notify = $('#notifySelect').value==='on';
-    store.settings.flash = $('#flashSelect').value;
-  }
-
-  async function saveSettings(){
-    readSettingsFromUI();
-    saveLocal(); applyColors(); applySettingsToUI();
-    await syncSave({ settings: store.settings });
-  }
-
-  // ====== Password / Locks ======
-  function settingsLocked(){ return !!store.settings.pwdHash; }
-  function disableSettings(disabled){
-    $$('#settingsDrawer input, #settingsDrawer select, #settingsDrawer button').forEach(el=>{
-      const id = el.id;
-      if(['settingsToggle','lockSettingsBtn','pwdInput','pausePwdInput','applyIdBtn','idInput','confirmYes','confirmNo'].includes(id)) return;
-      el.disabled = disabled;
-    });
-    $('#lockState').textContent = disabled? 'locked':'unlocked';
-  }
-
-  function openPwdModal(title){ $('#pwdModalTitle').textContent=title; $('#pwdModal').classList.add('show'); $('#pwdModalInput').value=''; $('#pwdModalError').textContent=''; $('#pwdModalInput').focus(); return new Promise((resolve)=>{
-      const ok=()=>{ const v=$('#pwdModalInput').value; $('#pwdModal').classList.remove('show'); resolve(v); cleanup(); };
-      const cancel=()=>{ $('#pwdModal').classList.remove('show'); resolve(null); cleanup(); };
-      const cleanup=()=>{ $('#pwdModalOk').removeEventListener('click', ok); $('#pwdModalCancel').removeEventListener('click', cancel); };
-      $('#pwdModalOk').addEventListener('click', ok); $('#pwdModalCancel').addEventListener('click', cancel);
-    });
-  }
-
-  async function requireSettingsUnlock(){
-    if(!settingsLocked()) return true;
-    const pw = await openPwdModal('Enter settings password');
-    if(pw==null) return false;
-    const h = await sha256Hex(pw);
-    if(h!==store.settings.pwdHash){ $('#pwdModal').classList.remove('show'); await sleep(50); $('#pwdModal').classList.add('show'); $('#pwdModalError').textContent='Incorrect password'; return false; }
-    return true;
-  }
-
-  async function handlePauseWithLock(){
-    if(!store.settings.pauseHash){ pauseTimer(); return; }
-    const pw = await openPwdModal('Enter pause password');
-    if(pw==null){ /* keep running */ return; }
-    const h = await sha256Hex(pw);
-    if(h!==store.settings.pauseHash){ $('#pwdModal').classList.remove('show'); await sleep(50); $('#pwdModal').classList.add('show'); $('#pwdModalError').textContent='Incorrect password'; return; }
-    pauseTimer();
-  }
-
-  // ====== DOM Events ======
-  function bind(){
-    // Wheels
-    attachWheel($('[data-unit="h"]'), 23);
-    attachWheel($('[data-unit="m"]'), 59);
-    attachWheel($('[data-unit="s"]'), 59);
-
-    // Presets
-    $$('#presetRow .chip').forEach(ch=> ch.addEventListener('click', ()=>{
-      const min = Number(ch.dataset.min||0);
-      setPickerFromMs(min*60*1000);
-      updateStartFromPicker();
-    }));
-
-    // Primary buttons
-    $('#startBtn').addEventListener('click', ()=>{
-      if(store.settings.notify && window.Notification && Notification.permission!=='granted' && Notification.permission!=='denied'){
-        Notification.requestPermission();
-      }
-      startTimer();
-    });
-    $('#clearBtn').addEventListener('click', ()=>{ setPickerFromMs(0); updateStartFromPicker(); });
-    $('#pauseBtn').addEventListener('click', handlePauseWithLock);
-    $('#resumeBtn').addEventListener('click', resumeTimer);
-    $('#deleteBtn').addEventListener('click', deleteTimer);
-    $('#restartBtn').addEventListener('click', restartTimer);
-    $('#dismissBtn').addEventListener('click', deleteTimer);
-
-    // Settings drawer
-    $('#settingsToggle').addEventListener('click', async()=>{
-      const open = !$('#settingsDrawer').classList.contains('open');
-      if(open && settingsLocked()){
-        const ok = await requireSettingsUnlock(); if(!ok) return;
-      }
-      $('#settingsDrawer').classList.toggle('open');
-      updateSyncUI();
-    });
-
-    // Save settings buttons
-    $('#applyPresets').addEventListener('click', saveSettings);
-    $('#bgColor').addEventListener('input', ()=>{ store.settings.colors.bg = $('#bgColor').value; applyColors(); saveSettings(); });
-    $('#textColor').addEventListener('input', ()=>{ store.settings.colors.text = $('#textColor').value; applyColors(); saveSettings(); });
-    $('#btnColor').addEventListener('input', ()=>{ store.settings.colors.btn = $('#btnColor').value; applyColors(); saveSettings(); });
-    $('#ringColor').addEventListener('input', ()=>{ store.settings.colors.ring = $('#ringColor').value; applyColors(); saveSettings(); });
-    $('#ringPausedColor').addEventListener('input', ()=>{ store.settings.colors.ringPaused = $('#ringPausedColor').value; applyColors(); saveSettings(); });
-    $('#ringFinishedColor').addEventListener('input', ()=>{ store.settings.colors.ringFinished = $('#ringFinishedColor').value; applyColors(); saveSettings(); });
-    $('#flashA').addEventListener('input', ()=>{ store.settings.colors.flashA = $('#flashA').value; applyColors(); saveSettings(); });
-    $('#flashB').addEventListener('input', ()=>{ store.settings.colors.flashB = $('#flashB').value; applyColors(); saveSettings(); });
-
-    $('#soundSelect').addEventListener('change', saveSettings);
-    $('#vibrateSelect').addEventListener('change', saveSettings);
-    $('#notifySelect').addEventListener('change', saveSettings);
-    $('#flashSelect').addEventListener('change', ()=>{ store.settings.flash = $('#flashSelect').value; setFlash('none'); saveSettings(); });
-
-    // Eyes
-    $$('.eye').forEach(btn=> btn.addEventListener('click', ()=>{
-      const id = btn.dataset.eyeFor; const inp = document.getElementById(id); if(!inp) return; const t= inp.getAttribute('type')==='password' ? 'text' : 'password'; inp.setAttribute('type', t);
-    }));
-
-    // ID apply
-    $('#applyIdBtn').addEventListener('click', async()=>{
-      const newId = ($('#idInput').value||'').trim(); if(!newId) return;
-      if(settingsLocked()){ const ok = await requireSettingsUnlock(); if(!ok) return; }
-      store.id = newId; saveLocal(); if(fbReady){ await syncLoad(store.id); listenRemote(); await syncSave({ settings: store.settings, state: exportState() }); } updateSyncUI();
-    });
-
-    // Password save/lock
-    $('#lockSettingsBtn').addEventListener('click', async()=>{
-      const pwd = $('#pwdInput').value.trim(); const pause = $('#pausePwdInput').value.trim();
-      if(pwd){ store.settings.pwdHash = await sha256Hex(pwd); } else { store.settings.pwdHash=''; }
-      if(pause){ store.settings.pauseHash = await sha256Hex(pause); } else { store.settings.pauseHash=''; }
-      $('#pwdInput').value=''; $('#pausePwdInput').value='';
-      disableSettings( settingsLocked() );
-      await saveSettings();
-    });
-
-    // Reset all
-    $('#resetBtn').addEventListener('click', ()=> $('#confirmModal').classList.add('show'));
-    $('#confirmNo').addEventListener('click', ()=> $('#confirmModal').classList.remove('show'));
-    $('#confirmYes').addEventListener('click', async()=>{
-      $('#confirmModal').classList.remove('show');
-      store.settings = deepClone(defaultSettings);
-      applySettingsToUI(); applyColors(); saveLocal(); await syncSave({ settings: store.settings }); updateSyncUI();
-    });
-
-    // Close drawer if clicking outside
-    document.addEventListener('click', e=>{
-      const d = $('#settingsDrawer'); const t = $('#settingsToggle');
-      if(d.classList.contains('open') && !d.contains(e.target) && !t.contains(e.target)){
-        d.classList.remove('open'); updateSyncUI(); disableSettings(settingsLocked());
-      }
-    });
-
-    // Page visibility (update title)
-    document.addEventListener('visibilitychange', ()=>{
-      if(document.hidden && timer.mode==='running'){ document.title = '⏱️ ' + fmt(Math.max(0, timer.endAt - now())); }
-      else if(timer.mode==='finished'){ document.title = '⏰ Time\'s up!'; }
-      else document.title = 'Activity Timer';
-    });
-  }
-
-  // ====== Boot ======
-  (async function(){
-    loadLocal();
-    applyColors();
-    applySettingsToUI();
-    disableSettings( settingsLocked() );
-    bind();
-    updateStartFromPicker();
-
-    $('#timeLeft').textContent = fmt(calcDurationFromPicker());
-
-    // Firebase
-    await initFirebase();
-    if(fbReady){ await syncLoad(store.id); listenRemote(); }
-
-    // Flash colours live
-    const flash = $('#flash');
-    const applyFlashColors = ()=>{ flash.style.setProperty('--flash-a', store.settings.colors.flashA); flash.style.setProperty('--flash-b', store.settings.colors.flashB); };
-    applyFlashColors();
-    ['flashA','flashB'].forEach(id=> document.getElementById(id).addEventListener('input', ()=>{ readSettingsFromUI(); applyFlashColors(); saveSettings(); }));
-  })();
-
-  </script></body>
+  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-database-compat.js"></script>
+  <script src="script.js"></script>
+</body>
 </html>
