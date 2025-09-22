@@ -166,9 +166,9 @@ input[type="color"]{ width: 100%; height: 40px; border-radius: 8px; border:1px s
         </div>
 
         <div class="presets" id="presetRow">
-          <div class="chip" data-min="2"><span><span class="subtle">min</span><br><span style="font-size:1.2rem; font-weight:800; color:var(--text)">2</span></span></div>
-          <div class="chip" data-min="5"><span><span class="subtle">min</span><br><span style="font-size:1.2rem; font-weight:800; color:var(--text)">5</span></span></div>
-          <div class="chip" data-min="10"><span><span class="subtle">min</span><br><span style="font-size:1.2rem; font-weight:800; color:var(--text)">10</span></span></div>
+          <div class=\"chip\" data-min=\"2\"><span class=\"chipLabel\"><span class=\"subtle\">min<\/span><br><span class=\"chipNum\">2<\/span><\/span><\/div>
+          <div class=\"chip\" data-min=\"5\"><span class=\"chipLabel\"><span class=\"subtle\">min<\/span><br><span class=\"chipNum\">5<\/span><\/span><\/div>
+          <div class=\"chip\" data-min=\"10\"><span class=\"chipLabel\"><span class=\"subtle\">min<\/span><br><span class=\"chipNum\">10<\/span><\/span><\/div>
         </div>
 
         <div class="controls mt8">
@@ -392,6 +392,7 @@ input[type="color"]{ width: 100%; height: 40px; border-radius: 8px; border:1px s
   const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
   const pad2 = n => String(n).padStart(2,'0');
   const now = () => Date.now();
+  const deepClone = (obj) => (window.structuredClone ? structuredClone(obj) : JSON.parse(JSON.stringify(obj)));
   const fmt = ms => {
     const sign = ms < 0 ? '-' : '';
     ms = Math.abs(ms);
@@ -426,7 +427,7 @@ input[type="color"]{ width: 100%; height: 40px; border-radius: 8px; border:1px s
     sound: 'phone', vibrate: true, notify: true, flash:'none',
     pwdHash: '', pauseHash: ''
   };
-  let store = { id: null, settings: structuredClone(defaultSettings), state: null };
+  let store = { id: null, settings: deepClone(defaultSettings), state: null };
   let db = null; let fbReady=false; let syncError=false; let lastRemote = null; let selfToken = Math.random().toString(36).slice(2);
 
   function saveLocal(){
@@ -435,7 +436,7 @@ input[type="color"]{ width: 100%; height: 40px; border-radius: 8px; border:1px s
   function loadLocal(){
     const raw = localStorage.getItem(LS_KEY);
     if(raw){
-      try{ const d = JSON.parse(raw); store.id = d.id || null; store.settings = Object.assign(structuredClone(defaultSettings), d.settings||{}); }catch(e){}
+      try{ const d = JSON.parse(raw); store.id = d.id || null; store.settings = Object.assign(deepClone(defaultSettings), d.settings||{}); }catch(e){}
     }
     if(!store.id){ store.id = genId(); saveLocal(); }
   }
@@ -467,7 +468,7 @@ input[type="color"]{ width: 100%; height: 40px; border-radius: 8px; border:1px s
       const snap = await refFor(id).get();
       if(snap.exists()){
         const data = snap.val();
-        if(data.settings){ store.settings = Object.assign(structuredClone(defaultSettings), data.settings); applySettingsToUI(); applyColors(); }
+        if(data.settings){ store.settings = Object.assign(deepClone(defaultSettings), data.settings); applySettingsToUI(); applyColors(); }
         if(data.state){ restoreRemoteState(data.state); }
       }else{
         // create new with current
@@ -489,7 +490,7 @@ input[type="color"]{ width: 100%; height: 40px; border-radius: 8px; border:1px s
     refFor(store.id).on('value', snap=>{
       const v = snap.val();
       if(!v || v.lastBy === selfToken) return; // ignore own writes
-      if(v.settings){ store.settings = Object.assign(structuredClone(defaultSettings), v.settings); applySettingsToUI(); applyColors(); }
+      if(v.settings){ store.settings = Object.assign(deepClone(defaultSettings), v.settings); applySettingsToUI(); applyColors(); }
       if(v.state){ restoreRemoteState(v.state); }
     }, err=>{ syncError=true; updateSyncUI(); });
   }
@@ -697,8 +698,8 @@ input[type="color"]{ width: 100%; height: 40px; border-radius: 8px; border:1px s
     if(s.flash && s.flash!=='none'){ setFlash(s.flash); }
     if(s.vibrate && 'vibrate' in navigator){ navigator.vibrate([200,120,200,120,400]); }
     if(s.notify){
-      if(Notification && Notification.permission==='granted') new Notification('Time's up!', { body: 'Your timer finished. Tap to return.', tag: 'activity-timer' });
-      else if(Notification && Notification.permission!=='denied'){ Notification.requestPermission().then(p=>{ if(p==='granted') new Notification('Time\'s up!', { body:'Your timer finished.', tag:'activity-timer' }); }); }
+      if('Notification' in window && Notification.permission==='granted') new Notification('Time's up!', { body: 'Your timer finished. Tap to return.', tag: 'activity-timer' });
+      else if('Notification' in window && Notification.permission!=='denied'){ Notification.requestPermission().then(p=>{ if(p==='granted') new Notification('Time\'s up!', { body:'Your timer finished.', tag:'activity-timer' }); }); }
     }
     playAlarm(s.sound);
     document.title = '⏰ Time\'s up!';
@@ -765,9 +766,9 @@ input[type="color"]{ width: 100%; height: 40px; border-radius: 8px; border:1px s
     const [a,b,c] = store.settings.presets;
     $('#pA').value=a; $('#pB').value=b; $('#pC').value=c;
     const chips = $$('#presetRow .chip');
-    chips[0].dataset.min=a; chips[0].querySelector('span span:last-child').textContent=a;
-    chips[1].dataset.min=b; chips[1].querySelector('span span:last-child').textContent=b;
-    chips[2].dataset.min=c; chips[2].querySelector('span span:last-child').textContent=c;
+    if(chips[0]){ chips[0].dataset.min=a; const n=chips[0].querySelector('.chipNum'); if(n) n.textContent=a; }
+    if(chips[1]){ chips[1].dataset.min=b; const n=chips[1].querySelector('.chipNum'); if(n) n.textContent=b; }
+    if(chips[2]){ chips[2].dataset.min=c; const n=chips[2].querySelector('.chipNum'); if(n) n.textContent=c; }
 
     // colors
     const cs = store.settings.colors;
@@ -921,7 +922,7 @@ input[type="color"]{ width: 100%; height: 40px; border-radius: 8px; border:1px s
     $('#confirmNo').addEventListener('click', ()=> $('#confirmModal').classList.remove('show'));
     $('#confirmYes').addEventListener('click', async()=>{
       $('#confirmModal').classList.remove('show');
-      store.settings = structuredClone(defaultSettings);
+      store.settings = deepClone(defaultSettings);
       applySettingsToUI(); applyColors(); saveLocal(); await syncSave({ settings: store.settings }); updateSyncUI();
     });
 
